@@ -1,0 +1,16 @@
+Authors: 
+
+Known Bugs: 
+
+Resources: 
+
+General Approach: 
+Part 1: Print a prompt 
+- Loop until command D or exits
+    - print $
+    - fgets with 4096
+
+Part 2: Read inputs 
+
+
+Part 3: Run commands 
