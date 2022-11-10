@@ -4,7 +4,7 @@ mysh: mysh.c
 	gcc $(CFLAGS) -o $@ $^
 
 mysh.strace: mysh
-	strace -o -f $@ ./$<
+	strace -f -o $@ ./$<
 
 .PHONY: clean
 clean:

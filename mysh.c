@@ -4,6 +4,9 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <fcntl.h>
+#define _GNU_SOURCE             /* See feature_test_macros(7) */
+#include <fcntl.h>              /* Definition of O_* constants */
+#include <unistd.h>
 
 #define INPUT_MAX_LENGTH 4096
 #define MAX_NUMBER_ARGS 10
@@ -59,15 +62,21 @@ void parse_user_input(char *input_args[])
     int i, j;
     int fd;
     int is_redirect;
-    char *prev_args[MAX_NUMBER_ARGS];
+    static char *prev_args[MAX_NUMBER_ARGS];
 
     is_redirect = 0; 
+    i = 0;
 
-    for(i = 0; i < INPUT_MAX_LENGTH; i++)
+    while(input_args[i] != NULL && is_redirect == 0)
     {
-        if(strcmp(input_args[i], ">") == 0)
+        
+        if(strcmp(input_args[i], ">") == 0) //or >>
         {
-            if((fd = open(input_args[i+1], O_CREAT | O_RDWR | O_TRUNC)) == -1)
+            // put a >> check here so dont truncate
+            fd = open(input_args[i+1], O_CREAT | O_WRONLY | O_TRUNC, 0666);
+            
+            //MAKE THIS ITS OWN FUNCTION WITH DESIRED FD
+            if(fd == -1)
             {
                 perror("open");
             }
@@ -77,24 +86,28 @@ void parse_user_input(char *input_args[])
                 perror("dup2");
             }
 
+            for(j = 0; j < i; j++)
+            {
+                prev_args[j] = input_args[j]; 
+            }
+
+            run_program(prev_args);
+
+            if(dup2(1, fd) == -1)
+            {
+                perror("dup2");
+            }
+            
+            close(fd); 
+
             is_redirect = 1; 
-
-            break; 
         }
+        //if <, open file.txt (RDONLY, no mode), change fd to zero, set and send run_program prev_args
+
+        i++;
     }
 
-    if(is_redirect)
-    {
-        for(j = 0; j < i; j++)
-        {
-            prev_args[j] = input_args[j]; 
-        }
-
-        run_program(prev_args);
-        
-        close(1); 
-    }
-    else
+    if(is_redirect == 0)
     {
         run_program(input_args);
     }
