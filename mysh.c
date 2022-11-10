@@ -64,7 +64,7 @@ void parse_user_input(char *input_args[])
     int is_redirect;
     static char *prev_args[MAX_NUMBER_ARGS];
 
-    is_redirect = 0; 
+    is_redirect = 0;
     i = 0;
 
     while(input_args[i] != NULL && is_redirect == 0)
@@ -88,7 +88,7 @@ void parse_user_input(char *input_args[])
 
             for(j = 0; j < i; j++)
             {
-                prev_args[j] = input_args[j]; 
+                prev_args[j] = input_args[j];
             }
 
             run_program(prev_args);
@@ -98,9 +98,10 @@ void parse_user_input(char *input_args[])
                 perror("dup2");
             }
             
-            close(fd); 
+            close(fd);
 
-            is_redirect = 1; 
+            is_redirect = 1;
+            //CREATE ONE BIG FUCNTION AND THEN MAKE SMALLER FUNCTIONS AFTER
         }
         //if <, open file.txt (RDONLY, no mode), change fd to zero, set and send run_program prev_args
 
@@ -123,7 +124,7 @@ void run_program(char *input_args[])
     {
         if(execvp(input_args[0], input_args) == -1)
         {
-            perror("evecvp"); 
+            perror("evecvp");
         }
     }
     //process is the parent
