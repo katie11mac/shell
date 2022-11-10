@@ -3,11 +3,13 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <fcntl.h>
 
 #define INPUT_MAX_LENGTH 4096
 #define MAX_NUMBER_ARGS 10
 
 char **get_user_input();
+void parse_user_input(char *input_args[]); 
 void run_program(char *input_args[]);
 
 int main(int argc, char *argv[])
@@ -17,7 +19,7 @@ int main(int argc, char *argv[])
     for(;;)
     {
         input_args = get_user_input();
-        run_program(input_args);
+        parse_user_input(input_args);
     }
 
     return 0;
@@ -50,6 +52,54 @@ char **get_user_input()
     }
 
     return input_args;
+}
+
+void parse_user_input(char *input_args[])
+{
+    int i, j;
+    int fd;
+    int is_redirect;
+    char *prev_args[MAX_NUMBER_ARGS];
+
+    is_redirect = 0; 
+
+    for(i = 0; i < INPUT_MAX_LENGTH; i++)
+    {
+        if(strcmp(input_args[i], ">") == 0)
+        {
+            if((fd = open(input_args[i+1], O_CREAT | O_RDWR | O_TRUNC)) == -1)
+            {
+                perror("open");
+            }
+
+            if(dup2(fd, 1) == -1)
+            {
+                perror("dup2");
+            }
+
+            is_redirect = 1; 
+
+            break; 
+        }
+    }
+
+    if(is_redirect)
+    {
+        for(j = 0; j < i; j++)
+        {
+            prev_args[j] = input_args[j]; 
+        }
+
+        run_program(prev_args);
+        
+        close(1); 
+    }
+    else
+    {
+        run_program(input_args);
+    }
+    
+
 }
 
 void run_program(char *input_args[])
