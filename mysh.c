@@ -58,7 +58,7 @@ char **get_user_input()
         {
             arg_index += 1; 
         }
-        pipe(pipe_fds);
+        pipe(pipe_fds); // What if we need to fork for pipe
         parse_user_input(input_args); 
 
         pipe_args = strtok(NULL, "|"); // increment step
