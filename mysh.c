@@ -30,13 +30,15 @@ char **get_user_input()
     char original_user_input[INPUT_MAX_LENGTH];
     char *edited_user_input;
     static char *input_args[MAX_NUMBER_ARGS];
+    static char *input_args2[MAX_NUMBER_ARGS];
     int arg_index; // index of the argument in the array
+    int arg_index2; // index of the arguments in the second array (other side of pipe)
+    int exit_value;
+    int i;
+    int j;
 
     char *pipe_args;
     int pipe_fds[2];
-
-    pipe_fds[0] = 0;
-    pipe_fds[1] = 1;
 
     printf("$ ");
     fgets(original_user_input, INPUT_MAX_LENGTH, stdin);
@@ -48,24 +50,91 @@ char **get_user_input()
     }
 
     pipe_args = strtok(edited_user_input, "|");
+    // while((input_args[j] = strtok(NULL, " ")) != NULL)
+    // {
+    //     arg_index += 1; 
+    // }
 
+
+    //iterates through the arguments on either side of pipe
     while(pipe_args != NULL)
     {
         arg_index = 0; 
-        input_args[arg_index] = strtok(pipe_args, " "); 
+        arg_index2 = 0;
+
+        //left side of pipe
+        input_args[arg_index] = strtok(pipe_args, " "); //seperates each argument
         arg_index += 1; 
+
+        //store every argument
         while((input_args[arg_index] = strtok(NULL, " ")) != NULL)
         {
             arg_index += 1; 
         }
-        pipe(pipe_fds); // What if we need to fork for pipe
-        parse_user_input(input_args); 
+        
+        pipe_args = strtok(edited_user_input, "|"); // increment step points to next chunk after pipe
 
-        pipe_args = strtok(NULL, "|"); // increment step
+        //right side of pipe
+        input_args2[arg_index2] = strtok(NULL, " "); //seperates each argument
+        arg_index2 += 1; 
+
+        //store every argument
+        while((input_args2[arg_index2] = strtok(NULL, " ")) != NULL)
+        {
+            arg_index2 += 1; 
+        }
+
+        //pipe to create write and read end
+        if(pipe(pipe_fds) == -1)
+        {
+            perror("pipe");
+        }
+
+        printf("input_args[0] = %s\n", input_args[0]);
+        printf("input_args2[0] = %s\n", input_args2[0]);
+
+        //fork and wait twice to run both commands
+        if(fork() == 0)
+        {
+            if((dup2(pipe_fds[1], 1)) == -1)
+            {
+                perror("dup2");
+            }
+
+            close(pipe_fds[1]);
+
+            printf("input_args[0] = %s\n", input_args[0]);
+
+            if(execvp(input_args[0], input_args) == -1)
+            {
+                perror("evecvp");
+            }
+        
+        }
+        if(fork() == 0)
+        {
+            if((dup2(pipe_fds[0], 0)) == -1)
+            {
+                perror("dup2");
+            }
+
+            close(pipe_fds[0]);
+
+            if(execvp(input_args2[0], input_args2) == -1)
+            {
+                perror("evecvp");
+            }
+            
+        }
+
+        //parent waits
+        for(i=0; i<2; i++)
+        {
+            wait(NULL);
+        }
+    
+        
     }
-
-    // strtok on | 
-    // go through 
 
     return input_args;
 }
