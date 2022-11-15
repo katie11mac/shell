@@ -12,7 +12,8 @@
 #define MAX_NUMBER_ARGS 10
 
 void get_user_input();
-void parse_user_input(char *input_args[]); 
+void parse_user_input(char *input_args[]);
+char **reset_array(char *array[]);
 
 int main(int argc, char *argv[])
 {
@@ -34,21 +35,16 @@ void get_user_input()
     static char *all_args[MAX_NUMBER_ARGS];
     int all_args_index;
 
-    static char *left_command_args[MAX_NUMBER_ARGS];
+    static char *command_args[MAX_NUMBER_ARGS];
     static char *right_command_args[MAX_NUMBER_ARGS];
-    int arg_index_l; // index of the argument in the array
-    int arg_index_r; // index of the arguments in the second array (other side of pipe)
-
-    pid_t child_pid1;
-    pid_t child_pid2;
-
+    int arg_index; // index of the argument in the array
+    
     int exit_value;
     int i;
-    
     int j;
 
-    char *pipe_left_arg;
-    char *pipe_right_arg;
+    char *pipe_left_arg; //change this var name
+    char *pipe_right_arg; //not using this atm
     int pipe_fds[2];
 
     //print prompt and get user input
@@ -72,65 +68,53 @@ void get_user_input()
         all_args_index += 1; 
     }
 
-    printf("first arg = %s\n", all_args[0]);
-    printf("second arg = %s\n", all_args[1]);
+    // printf("first arg = %s\n", all_args[0]);
+    // printf("second arg = %s\n", all_args[1]);
 
     //IF THERE ARE NO PIPES
     if(all_args_index == 1)
     {
         pipe_left_arg = all_args[0];
 
-        arg_index_l = 0;
+        arg_index = 0;
 
-        left_command_args[arg_index_l] = strtok(pipe_left_arg, " "); //seperates each argument
-        arg_index_l += 1; 
+        command_args[arg_index] = strtok(pipe_left_arg, " "); //seperates each argument
+        arg_index += 1; 
 
-        while((left_command_args[arg_index_l] = strtok(NULL, " ")) != NULL)
+        while((command_args[arg_index] = strtok(NULL, " ")) != NULL)
         {
-            arg_index_l += 1; 
+            arg_index += 1; 
         }
 
-        parse_user_input(left_command_args);
+        parse_user_input(command_args);
 
     }
     //IF THERE ARE PIPES
-    //iterate through each pair of arguments on either side of the pipe
-    for(j = 0; j < (all_args_index - 1); j++)
+    else
     {
-        pipe_left_arg = all_args[j];
-        pipe_right_arg = all_args[j+1];
+        //1. HANDLE FIRST LEFT SIDE OF PIPE
 
-        arg_index_l = 0; 
-        arg_index_r = 0;
+        //a. CREATE STRING ARRAY FOR LEFTMOST SIDE OF PIPE
+        pipe_left_arg = all_args[0];
+        arg_index = 0; 
 
-        //1. CREATE STRING ARRAY FOR LEFT SIDE OF PIPE
-        left_command_args[arg_index_l] = strtok(pipe_left_arg, " "); //seperates each argument
-        arg_index_l += 1; 
+        command_args[arg_index] = strtok(pipe_left_arg, " "); //seperates each argument
+        arg_index += 1; 
 
-        while((left_command_args[arg_index_l] = strtok(NULL, " ")) != NULL)
+        while((command_args[arg_index] = strtok(NULL, " ")) != NULL)
         {
-            arg_index_l += 1; 
-        }
-        
-        //2. CREATE STRING ARRAY FOR RIGHT SIDE OF PIPE
-        right_command_args[arg_index_r] = strtok(pipe_right_arg, " "); //seperates each argument
-        arg_index_r += 1; 
-
-        while((right_command_args[arg_index_r] = strtok(NULL, " ")) != NULL)
-        {
-            arg_index_r += 1; 
+            arg_index += 1; 
         }
 
-        printf("first input = %s\n", left_command_args[0]);
-        printf("second input = %s\n", right_command_args[0]);
-
-        //pipe to create write and read end
+        //b. pipe to create write and read end
         if(pipe(pipe_fds) == -1)
         {
             perror("pipe");
         }
 
-        // close the write and read ends of the pipes 
+        printf("first arg = %s\n", command_args[0]);
+
+        //1c. fork for left side
         if(fork() == 0)
         {
             if((dup2(pipe_fds[1], 1)) == -1)
@@ -140,12 +124,84 @@ void get_user_input()
 
             close(pipe_fds[0]);
 
-            if(execvp(left_command_args[0], left_command_args) == -1)
+            if(execvp(command_args[0], command_args) == -1)
             {
                 perror("evecvp");
             }
         
         }
+
+        //1d. clear argument array
+        for(i = 0; i < MAX_NUMBER_ARGS; i++) //CHECK BUGS
+        {
+            command_args[i] = NULL;
+        }
+
+        //2. FOR LOOP TO HANDLE MIDDLE PIPES
+        for(j = 1; j < all_args_index - 1; j++)
+        {
+            
+            //2a. get arg array
+            pipe_left_arg = all_args[j];
+            arg_index = 0; 
+
+            command_args[arg_index] = strtok(pipe_left_arg, " "); //seperates each argument
+            arg_index += 1; 
+
+            while((command_args[arg_index] = strtok(NULL, " ")) != NULL)
+            {
+                arg_index += 1; 
+            }
+
+            printf("middle command = %s\n", command_args[0]);
+
+            //2b. fork and dup twice
+            if(fork() == 0)
+            {
+                if((dup2(pipe_fds[0], 0)) == -1)
+                {
+                    perror("dup2");
+                }
+
+                if((dup2(pipe_fds[1], 1)) == -1)
+                {
+                    perror("dup2");
+                }
+
+                close(pipe_fds[0]);
+                close(pipe_fds[1]);
+
+                if(execvp(command_args[0], command_args) == -1)
+                {
+                    perror("evecvp");
+                }
+            
+            }
+
+            for(i = 0; i < MAX_NUMBER_ARGS; i++)
+            {
+                command_args[i] = NULL;
+            }
+
+        }
+
+        //3. HANDLE LAST RIGHT SIDE OF PIPE
+        //3c. get arg array
+        pipe_left_arg = all_args[all_args_index-1];
+        arg_index = 0; 
+
+        // printf("pipe left arg = %s\n", pipe_left_arg);
+
+        command_args[arg_index] = strtok(pipe_left_arg, " "); //seperates each argument
+        arg_index += 1; 
+
+        while((command_args[arg_index] = strtok(NULL, " ")) != NULL)
+        {
+            arg_index += 1; 
+        }
+
+        printf("last arg = %s\n", command_args[0]);
+
         if(fork() == 0)
         {
             if((dup2(pipe_fds[0], 0)) == -1)
@@ -155,22 +211,104 @@ void get_user_input()
 
             close(pipe_fds[1]);
 
-            if(execvp(right_command_args[0], right_command_args) == -1)
+            if(execvp(command_args[0], command_args) == -1)
             {
                 perror("evecvp");
             }
         }
 
+
+        //4. close ends of pipe
         close(pipe_fds[0]);
         close(pipe_fds[1]);
         
-        wait(&exit_value);
-        wait(&exit_value);
+        //5. wait for each child
+        for(j = 0; j < all_args_index; j++)
+        {
+            wait(&exit_value);
+        }
         
-        // wait(&exit_value);
-        // wait(NULL);
-  
     }
+
+
+
+    //iterate through each pair of arguments on either side of the pipe
+    // for(j = 0; j < (all_args_index - 1); j++)
+    // {
+    //     pipe_left_arg = all_args[j];
+    //     pipe_right_arg = all_args[j+1];
+
+    //     arg_index_l = 0; 
+    //     arg_index_r = 0;
+
+    //     //1. CREATE STRING ARRAY FOR LEFT SIDE OF PIPE
+    //     left_command_args[arg_index_l] = strtok(pipe_left_arg, " "); //seperates each argument
+    //     arg_index_l += 1; 
+
+    //     while((left_command_args[arg_index_l] = strtok(NULL, " ")) != NULL)
+    //     {
+    //         arg_index_l += 1; 
+    //     }
+        
+    //     //2. CREATE STRING ARRAY FOR RIGHT SIDE OF PIPE
+    //     right_command_args[arg_index_r] = strtok(pipe_right_arg, " "); //seperates each argument
+    //     arg_index_r += 1; 
+
+    //     while((right_command_args[arg_index_r] = strtok(NULL, " ")) != NULL)
+    //     {
+    //         arg_index_r += 1; 
+    //     }
+
+    //     printf("first input = %s\n", left_command_args[0]);
+    //     printf("second input = %s\n", right_command_args[0]);
+
+    //     //pipe to create write and read end
+    //     if(pipe(pipe_fds) == -1)
+    //     {
+    //         perror("pipe");
+    //     }
+
+    //     // close the write and read ends of the pipes 
+    //     if(fork() == 0)
+    //     {
+    //         if((dup2(pipe_fds[1], 1)) == -1)
+    //         {
+    //             perror("dup2");
+    //         }
+
+    //         close(pipe_fds[0]);
+
+    //         if(execvp(left_command_args[0], left_command_args) == -1)
+    //         {
+    //             perror("evecvp");
+    //         }
+        
+    //     }
+    //     if(fork() == 0)
+    //     {
+    //         if((dup2(pipe_fds[0], 0)) == -1)
+    //         {
+    //             perror("dup2");
+    //         }
+
+    //         close(pipe_fds[1]);
+
+    //         if(execvp(right_command_args[0], right_command_args) == -1)
+    //         {
+    //             perror("evecvp");
+    //         }
+    //     }
+
+    //     close(pipe_fds[0]);
+    //     close(pipe_fds[1]);
+        
+    //     wait(&exit_value);
+    //     wait(&exit_value);
+        
+    //     // wait(&exit_value);
+    //     // wait(NULL);
+  
+    // }
 
 }
 
@@ -297,6 +435,5 @@ void parse_user_input(char *input_args[])
             wait(&exit_value);
         }
     }
-    
-
 }
+

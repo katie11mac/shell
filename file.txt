@@ -1,0 +1,8 @@
+total 108
+-rw-r--r-- 1 lschweitzer lschweitzer     0 Nov 10 16:09 file.txt
+-rw-r--r-- 1 lschweitzer lschweitzer   151 Nov 10 15:40 Makefile
+-rwxr-xr-x 1 lschweitzer lschweitzer 29424 Nov 10 16:09 mysh
+-rw-r--r-- 1 lschweitzer lschweitzer  2735 Nov 10 16:09 mysh.c
+-rw-r--r-- 1 lschweitzer lschweitzer 59169 Nov 10 15:56 mysh.strace
+-rw-r--r-- 1 lschweitzer lschweitzer   399 Nov 10 16:01 output.txt
+-rw-r--r-- 1 lschweitzer lschweitzer   194 Nov  8 20:29 README
