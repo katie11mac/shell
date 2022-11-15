@@ -30,6 +30,7 @@ void get_user_input()
     char original_user_input[INPUT_MAX_LENGTH];
     char *edited_user_input;
 
+    //array of all things in between each |
     static char *all_args[MAX_NUMBER_ARGS];
     int all_args_index;
 
@@ -129,17 +130,15 @@ void get_user_input()
             perror("pipe");
         }
 
-        //fork and wait twice to run both commands
-
-        child_pid1 = fork();
-        child_pid2 = fork();
-
-        if(child_pid1 == 0)
+        // close the write and read ends of the pipes 
+        if(fork() == 0)
         {
             if((dup2(pipe_fds[1], 1)) == -1)
             {
                 perror("dup2");
             }
+
+            close(pipe_fds[0]);
 
             if(execvp(left_command_args[0], left_command_args) == -1)
             {
@@ -147,23 +146,29 @@ void get_user_input()
             }
         
         }
-        if(child_pid2 == 0)
+        if(fork() == 0)
         {
             if((dup2(pipe_fds[0], 0)) == -1)
             {
                 perror("dup2");
             }
 
+            close(pipe_fds[1]);
+
             if(execvp(right_command_args[0], right_command_args) == -1)
             {
                 perror("evecvp");
             }
         }
-        else
-        {
-           wait(&exit_value);
-           wait(&exit_value);
-        }
+
+        close(pipe_fds[0]);
+        close(pipe_fds[1]);
+        
+        wait(&exit_value);
+        wait(&exit_value);
+        
+        // wait(&exit_value);
+        // wait(NULL);
   
     }
 
