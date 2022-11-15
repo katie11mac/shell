@@ -38,6 +38,9 @@ void get_user_input()
     int arg_index_l; // index of the argument in the array
     int arg_index_r; // index of the arguments in the second array (other side of pipe)
 
+    pid_t child_pid1;
+    pid_t child_pid2;
+
     int exit_value;
     int i;
     
@@ -127,7 +130,11 @@ void get_user_input()
         }
 
         //fork and wait twice to run both commands
-        if(fork() == 0)
+
+        child_pid1 = fork();
+        child_pid2 = fork();
+
+        if(child_pid1 == 0)
         {
             if((dup2(pipe_fds[1], 1)) == -1)
             {
@@ -140,7 +147,7 @@ void get_user_input()
             }
         
         }
-        if(fork() == 0)
+        if(child_pid2 == 0)
         {
             if((dup2(pipe_fds[0], 0)) == -1)
             {
@@ -152,11 +159,10 @@ void get_user_input()
                 perror("evecvp");
             }
         }
-
-        //parent waits
-        for(i=0; i<2; i++)
+        else
         {
-            wait(&exit_value);
+           wait(&exit_value);
+           wait(&exit_value);
         }
   
     }
