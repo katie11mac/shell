@@ -11,7 +11,7 @@
 #define INPUT_MAX_LENGTH 4096
 #define MAX_NUMBER_ARGS 10
 
-char **get_user_input();
+void get_user_input();
 void parse_user_input(char *input_args[]); 
 
 int main(int argc, char *argv[])
@@ -25,73 +25,106 @@ int main(int argc, char *argv[])
     return 0;
 }
 
-char **get_user_input()
+void get_user_input()
 {
     char original_user_input[INPUT_MAX_LENGTH];
     char *edited_user_input;
-    static char *input_args[MAX_NUMBER_ARGS];
-    static char *input_args2[MAX_NUMBER_ARGS];
-    int arg_index; // index of the argument in the array
-    int arg_index2; // index of the arguments in the second array (other side of pipe)
+
+    static char *all_args[MAX_NUMBER_ARGS];
+    int all_args_index;
+
+    static char *left_command_args[MAX_NUMBER_ARGS];
+    static char *right_command_args[MAX_NUMBER_ARGS];
+    int arg_index_l; // index of the argument in the array
+    int arg_index_r; // index of the arguments in the second array (other side of pipe)
+
     int exit_value;
     int i;
+    
     int j;
 
-    char *pipe_args;
+    char *pipe_left_arg;
+    char *pipe_right_arg;
     int pipe_fds[2];
 
+    //print prompt and get user input
     printf("$ ");
     fgets(original_user_input, INPUT_MAX_LENGTH, stdin);
+
+    //get rid of \n character
     edited_user_input = strtok(original_user_input, "\n");
 
+    //check if command is exit
     if(strcmp(edited_user_input, "exit") == 0)
     {
         exit(0);
     }
 
-    pipe_args = strtok(edited_user_input, "|");
-    // while((input_args[j] = strtok(NULL, " ")) != NULL)
-    // {
-    //     arg_index += 1; 
-    // }
-
-
-    //iterates through the arguments on either side of pipe
-    while(pipe_args != NULL)
+    //fill an array of strings to the left and right of each |
+    all_args[0] = strtok(edited_user_input, "|");
+    all_args_index = 1;
+    while((all_args[all_args_index] = strtok(NULL, "|")) != NULL)
     {
-        arg_index = 0; 
-        arg_index2 = 0;
+        all_args_index += 1; 
+    }
 
-        //left side of pipe
-        input_args[arg_index] = strtok(pipe_args, " "); //seperates each argument
-        arg_index += 1; 
+    printf("first arg = %s\n", all_args[0]);
+    printf("second arg = %s\n", all_args[1]);
 
-        //store every argument
-        while((input_args[arg_index] = strtok(NULL, " ")) != NULL)
+    //IF THERE ARE NO PIPES
+    if(all_args_index == 1)
+    {
+        pipe_left_arg = all_args[0];
+
+        arg_index_l = 0;
+
+        left_command_args[arg_index_l] = strtok(pipe_left_arg, " "); //seperates each argument
+        arg_index_l += 1; 
+
+        while((left_command_args[arg_index_l] = strtok(NULL, " ")) != NULL)
         {
-            arg_index += 1; 
+            arg_index_l += 1; 
+        }
+
+        parse_user_input(left_command_args);
+
+    }
+    //IF THERE ARE PIPES
+    //iterate through each pair of arguments on either side of the pipe
+    for(j = 0; j < (all_args_index - 1); j++)
+    {
+        pipe_left_arg = all_args[j];
+        pipe_right_arg = all_args[j+1];
+
+        arg_index_l = 0; 
+        arg_index_r = 0;
+
+        //1. CREATE STRING ARRAY FOR LEFT SIDE OF PIPE
+        left_command_args[arg_index_l] = strtok(pipe_left_arg, " "); //seperates each argument
+        arg_index_l += 1; 
+
+        while((left_command_args[arg_index_l] = strtok(NULL, " ")) != NULL)
+        {
+            arg_index_l += 1; 
         }
         
-        pipe_args = strtok(edited_user_input, "|"); // increment step points to next chunk after pipe
+        //2. CREATE STRING ARRAY FOR RIGHT SIDE OF PIPE
+        right_command_args[arg_index_r] = strtok(pipe_right_arg, " "); //seperates each argument
+        arg_index_r += 1; 
 
-        //right side of pipe
-        input_args2[arg_index2] = strtok(NULL, " "); //seperates each argument
-        arg_index2 += 1; 
-
-        //store every argument
-        while((input_args2[arg_index2] = strtok(NULL, " ")) != NULL)
+        while((right_command_args[arg_index_r] = strtok(NULL, " ")) != NULL)
         {
-            arg_index2 += 1; 
+            arg_index_r += 1; 
         }
+
+        printf("first input = %s\n", left_command_args[0]);
+        printf("second input = %s\n", right_command_args[0]);
 
         //pipe to create write and read end
         if(pipe(pipe_fds) == -1)
         {
             perror("pipe");
         }
-
-        printf("input_args[0] = %s\n", input_args[0]);
-        printf("input_args2[0] = %s\n", input_args2[0]);
 
         //fork and wait twice to run both commands
         if(fork() == 0)
@@ -101,11 +134,7 @@ char **get_user_input()
                 perror("dup2");
             }
 
-            close(pipe_fds[1]);
-
-            printf("input_args[0] = %s\n", input_args[0]);
-
-            if(execvp(input_args[0], input_args) == -1)
+            if(execvp(left_command_args[0], left_command_args) == -1)
             {
                 perror("evecvp");
             }
@@ -118,25 +147,20 @@ char **get_user_input()
                 perror("dup2");
             }
 
-            close(pipe_fds[0]);
-
-            if(execvp(input_args2[0], input_args2) == -1)
+            if(execvp(right_command_args[0], right_command_args) == -1)
             {
                 perror("evecvp");
             }
-            
         }
 
         //parent waits
         for(i=0; i<2; i++)
         {
-            wait(NULL);
+            wait(&exit_value);
         }
-    
-        
+  
     }
 
-    return input_args;
 }
 
 void parse_user_input(char *input_args[])
