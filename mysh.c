@@ -260,6 +260,12 @@ void get_user_input()
         {
             printf("even\n");
 
+            if(all_args_index > 2)
+            {
+                close(pipe_fd2[0]);
+                close(pipe_fd2[1]);
+            }
+
             if(fork() == 0)
             {
                 if((dup2(pipe_fd1[0], 0)) == -1)
@@ -278,6 +284,9 @@ void get_user_input()
         else //if last one is odd we use fd2
         {
             printf("odd\n");
+            
+            close(pipe_fd1[0]);
+            close(pipe_fd1[1]);
 
             if(fork() == 0)
             {
