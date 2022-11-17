@@ -159,6 +159,7 @@ void get_user_input()
 
                     close(pipe_fd1[0]);
 
+                    printf("execing %s 143\n", prev_args[0]);
                     if(execvp(prev_args[0], prev_args) == -1)
                     {
                         perror("evecvp");
@@ -191,6 +192,7 @@ void get_user_input()
 
                 close(pipe_fd1[0]);
 
+                printf("execing %s 213\n", command_args[0]);
                 if(execvp(command_args[0], command_args) == -1)
                 {
                     perror("evecvp");
@@ -251,6 +253,7 @@ void get_user_input()
 
                     close(pipe_fd1[0]);
 
+                    printf("execing %s 132\n", command_args[0]);
                     if(execvp(command_args[0], command_args) == -1)
                     {
                         perror("evecvp");
@@ -288,6 +291,7 @@ void get_user_input()
 
                     close(pipe_fd2[0]);
 
+                    printf("execing %s 13\n", command_args[0]);
                     if(execvp(command_args[0], command_args) == -1)
                     {
                         perror("evecvp");
@@ -366,7 +370,7 @@ void get_user_input()
                     //process is the child
                     if(fork() == 0)
                     {
-                        if(dup2(fd, 1) == -1)
+                        if((dup2(fd, 1)) == -1)
                         {
                             perror("dup2");
                         }
@@ -378,6 +382,7 @@ void get_user_input()
 
                         close(pipe_fd1[1]);
 
+                        printf("execing %s 123\n", prev_args[0]);
                         if(execvp(prev_args[0], prev_args) == -1)
                         {
                             perror("evecvp");
