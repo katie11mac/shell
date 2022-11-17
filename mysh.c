@@ -36,15 +36,19 @@ void get_user_input()
     int all_args_index;
 
     static char *command_args[MAX_NUMBER_ARGS];
-    static char *right_command_args[MAX_NUMBER_ARGS];
     int arg_index; // index of the argument in the array
     
     int exit_value;
     int i;
+
+    int x, k; //index for checking for <
+    int fd; //fd for < and >>
+    static char *prev_args[MAX_NUMBER_ARGS]; //arg array for <
+
+    int is_redirect;
     int j;
 
     char *pipe_left_arg; //change this var name
-    char *pipe_right_arg; //not using this atm
     
     //write and read ends of pipe
     int pipe_fd1[2];
@@ -89,7 +93,7 @@ void get_user_input()
             arg_index += 1; 
         }
 
-        parse_user_input(command_args);
+        parse_user_input(command_args); //handle <,>, and >>
 
     }
     //IF THERE ARE PIPES
@@ -115,23 +119,84 @@ void get_user_input()
             perror("pipe");
         }
 
-        printf("first arg = %s\n", command_args[0]);
+        // CHECK FOR <
+        x = 0;
+        is_redirect = 0;
 
-        //1c. fork for left side
-        if(fork() == 0)
+        while(command_args[x] != NULL && is_redirect == 0)
         {
-            if((dup2(pipe_fd1[1], 1)) == -1)
+            // INPUT REDIRECTION
+            if(strcmp(command_args[x], "<") == 0)
             {
-                perror("dup2");
+                printf("INPUT REDIRECTION \n");
+                fd = open(command_args[x+1], O_RDONLY);
+                
+                if(fd == -1)
+                {
+                    perror("open");
+                }
+
+                // Process all arguments until the redirection
+                for(k = 0; k < x; k++)
+                {
+                    prev_args[k] = command_args[k];
+                }
+
+                //process is the child
+                if(fork() == 0)
+                {
+                    //dup for input redirection
+                    if(dup2(fd, 0) == -1)
+                    {
+                        perror("dup2");
+                    }
+
+                    //dup for piping
+                    if((dup2(pipe_fd1[1], 1)) == -1)
+                    {
+                        perror("dup2");
+                    }
+
+                    close(pipe_fd1[0]);
+
+                    if(execvp(prev_args[0], prev_args) == -1)
+                    {
+                        perror("evecvp");
+                    }
+                }
+                //process is the parent
+                else
+                {
+                    wait(&exit_value);
+                }
+                
+                close(fd);
+
+                is_redirect = 1;
             }
+            x++;
+        }
 
-            close(pipe_fd1[0]);
+        if(is_redirect == 0) //if not redirected, normal
+        {
+            printf("first arg = %s\n", command_args[0]);
 
-            if(execvp(command_args[0], command_args) == -1)
+            //1c. fork for left side
+            if(fork() == 0)
             {
-                perror("evecvp");
+                if((dup2(pipe_fd1[1], 1)) == -1)
+                {
+                    perror("dup2");
+                }
+
+                close(pipe_fd1[0]);
+
+                if(execvp(command_args[0], command_args) == -1)
+                {
+                    perror("evecvp");
+                }
+            
             }
-        
         }
 
         //1d. clear argument array
@@ -258,7 +323,7 @@ void get_user_input()
 
         if((all_args_index % 2) == 0) //if last one is even we use fd1
         {
-            printf("even\n");
+            printf("all_args_index = %d\n", all_args_index);
 
             if(all_args_index > 2)
             {
@@ -266,18 +331,88 @@ void get_user_input()
                 close(pipe_fd2[1]);
             }
 
-            if(fork() == 0)
+            // CHECK FOR >
+            x = 0;
+            is_redirect = 0;
+
+            while(command_args[x] != NULL && is_redirect == 0) // change these
             {
-                if((dup2(pipe_fd1[0], 0)) == -1)
+                // OUTPUT REDIRECTION
+                if((strcmp(command_args[x], ">") == 0) || (strcmp(command_args[x], ">>") == 0)) //or >>
                 {
-                    perror("dup2");
+                    printf("OUTPUT REDIRECTION\n");
+                    
+                    // put a >> check here so dont truncate
+                    if(strcmp(command_args[x], ">") == 0)
+                    {
+                        fd = open(command_args[x+1], O_CREAT | O_WRONLY | O_TRUNC, 0666);
+                    }
+                    else
+                    {
+                        fd = open(command_args[x+1], O_CREAT | O_WRONLY | O_APPEND, 0666);
+                    }
+                    
+                    if(fd == -1)
+                    {
+                        perror("open");
+                    }
+
+                    // Process all arguments until the redirection
+                    for(k = 0; k < x; k++)
+                    {
+                        prev_args[k] = command_args[k];
+                    }
+
+                    //process is the child
+                    if(fork() == 0)
+                    {
+                        if(dup2(fd, 1) == -1)
+                        {
+                            perror("dup2");
+                        }
+
+                        if((dup2(pipe_fd1[0], 0)) == -1)
+                        {
+                            perror("dup2");
+                        }
+
+                        close(pipe_fd1[1]);
+
+                        if(execvp(prev_args[0], prev_args) == -1)
+                        {
+                            perror("evecvp");
+                        }
+                    }
+                    //process is the parent
+                    else
+                    {
+                        wait(&exit_value);
+                    }
+                    
+                    close(fd);
+
+                    is_redirect = 1;
                 }
+                x++;
+            }
 
-                close(pipe_fd1[1]);
-
-                if(execvp(command_args[0], command_args) == -1)
+            if(is_redirect == 0)
+            {
+                printf("NO OUTPUT REDIRECTION\n");
+            
+                if(fork() == 0)
                 {
-                    perror("evecvp");
+                    if((dup2(pipe_fd1[0], 0)) == -1)
+                    {
+                        perror("dup2");
+                    }
+
+                    close(pipe_fd1[1]);
+
+                    if(execvp(command_args[0], command_args) == -1)
+                    {
+                        perror("evecvp");
+                    }
                 }
             }
         }
@@ -288,18 +423,85 @@ void get_user_input()
             close(pipe_fd1[0]);
             close(pipe_fd1[1]);
 
-            if(fork() == 0)
+            // CHECK FOR >
+            x = 0;
+            is_redirect = 0;
+
+            while(command_args[x] != NULL && is_redirect == 0) // change these
             {
-                if((dup2(pipe_fd2[0], 0)) == -1)
+                
+                // OUTPUT REDIRECTION
+                if((strcmp(command_args[x], ">") == 0) || (strcmp(command_args[x], ">>") == 0)) //or >>
                 {
-                    perror("dup2");
+                    // put a >> check here so dont truncate
+                    if(strcmp(command_args[x], ">") == 0)
+                    {
+                        fd = open(command_args[x+1], O_CREAT | O_WRONLY | O_TRUNC, 0666);
+                    }
+                    else
+                    {
+                        fd = open(command_args[x+1], O_CREAT | O_WRONLY | O_APPEND, 0666);
+                    }
+                    
+                    if(fd == -1)
+                    {
+                        perror("open");
+                    }
+
+                    // Process all arguments until the redirection
+                    for(k = 0; k < x; k++)
+                    {
+                        prev_args[k] = command_args[k];
+                    }
+
+                    //process is the child
+                    if(fork() == 0)
+                    {
+                        if(dup2(fd, 1) == -1)
+                        {
+                            perror("dup2");
+                        }
+
+                        if((dup2(pipe_fd2[0], 0)) == -1)
+                        {
+                            perror("dup2");
+                        }
+
+                        close(pipe_fd2[1]);
+
+                        if(execvp(prev_args[0], prev_args) == -1)
+                        {
+                            perror("evecvp");
+                        }
+                    }
+                    //process is the parent
+                    else
+                    {
+                        wait(&exit_value);
+                    }
+                    
+                    close(fd);
+
+                    is_redirect = 1;
                 }
-
-                close(pipe_fd2[1]);
-
-                if(execvp(command_args[0], command_args) == -1)
+                x++;
+            }
+            
+            if(is_redirect == 0)
+            {
+                if(fork() == 0)
                 {
-                    perror("evecvp");
+                    if((dup2(pipe_fd2[0], 0)) == -1)
+                    {
+                        perror("dup2");
+                    }
+
+                    close(pipe_fd2[1]);
+
+                    if(execvp(command_args[0], command_args) == -1)
+                    {
+                        perror("evecvp");
+                    }
                 }
             }
             
@@ -316,10 +518,9 @@ void get_user_input()
         {
             wait(&exit_value);
         }
-        
     }
-
 }
+
 
 void parse_user_input(char *input_args[])
 {
