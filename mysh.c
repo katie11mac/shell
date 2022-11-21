@@ -314,13 +314,10 @@ void process_redirection(char *input_args[], int fd_dup, int fd_close, int fd_du
         if((strcmp(input_args[i], ">") == 0)) {
             indices[1] = i;
 
-            printf("prev_args[1] = %s\n", prev_args[1]);
-
             if(is_redirect == 0){
                 // Process all arguments until the redirection
                 for(j = 0; j < i; j++){
                     prev_args[j] = input_args[j];
-                    printf("input_args[%d] = %s\n", j, input_args[j]);
                 }
             }
             is_redirect = 1;
@@ -333,7 +330,6 @@ void process_redirection(char *input_args[], int fd_dup, int fd_close, int fd_du
                 // Process all arguments until the redirection
                 for(j = 0; j < i; j++){
                     prev_args[j] = input_args[j];
-                    printf("input_args[%d] = %s\n", j, input_args[j]);
                 }
             }
             is_redirect = 1;
@@ -347,17 +343,13 @@ void process_redirection(char *input_args[], int fd_dup, int fd_close, int fd_du
         //if < and > provided 
         if(indices[1] != -1){ 
             output_index = indices[1];
-
-            printf("output index = %d\n", output_index);
             fd_out = open(input_args[output_index+1], O_CREAT | O_WRONLY | O_TRUNC, 0666);
             
             if(fd_out == -1){
                 perror("open");
                 exit(1);
             }
-
-            printf("input index = %d\n", input_index);
-            printf("input_args[input_index+1] = %s\n", input_args[input_index+1]);
+            
             fd_in = open(input_args[input_index+1], O_RDONLY);
             
             if(fd_in == -1){
