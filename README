@@ -1,16 +1,10 @@
-Authors: 
+Authors: Lindsey Schweitzer and Katie Macalintal
 
-Known Bugs: 
+Known Bugs: N/A
 
 Resources: 
-
-General Approach: 
-Part 1: Print a prompt 
-- Loop until command D or exits
-    - print $
-    - fgets with 4096
-
-Part 2: Read inputs 
-
-
-Part 3: Run commands 
+https://www.tutorialspoint.com/c_standard_library/c_function_strtok.htm
+https://www.geeksforgeeks.org/fgets-gets-c-language/
+https://www.tutorialspoint.com/cprogramming/c_return_arrays_from_function.htm
+https://www.geeksforgeeks.org/wc-command-linux-examples/
+https://www.cyberciti.biz/faq/run-execute-sh-shell-script/
