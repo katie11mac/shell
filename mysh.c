@@ -298,10 +298,6 @@ void parse_user_input(char *input_args[], int fd_dup, int fd_close, int fd_dup1,
         i++;
     }
 
-    for(i = 0; i < MAX_NUMBER_ARGS; i++){
-        printf("prev_args[%d] = %s\n", i, prev_args[i]);
-    }
-
     //if < provided
     if(indices[0] != -1){
         input_index = indices[0];
