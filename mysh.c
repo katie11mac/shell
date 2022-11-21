@@ -241,8 +241,13 @@ void parse_user_input(char *input_args[], int fd_dup, int fd_close, int fd_dup1,
     static char *prev_args[MAX_NUMBER_ARGS];
     int input_index, output_index;
 
-    is_redirect = 0;
+    //clear prev_args array
+    for(i = 0; i < MAX_NUMBER_ARGS; i++){
+        prev_args[i] = '\0';
+    }
+
     i = 0;
+    is_redirect = 0;
 
     //parse input_args and fill the indices array to know which redirections were provided 
     while(input_args[i] != NULL){
@@ -255,21 +260,28 @@ void parse_user_input(char *input_args[], int fd_dup, int fd_close, int fd_dup1,
                 // Process all arguments until the redirection
                 for(j = 0; j < i; j++){
                     prev_args[j] = input_args[j];
+                    printf("input_args[%d] = %s\n", j, input_args[j]);
                 }
+                is_redirect = 1;
             }
-            is_redirect = 1;
+            
         }
         
         //store index of output redirection carrot
         if((strcmp(input_args[i], ">") == 0)) {
             indices[1] = i;
+
+            printf("prev_args[1] = %s\n", prev_args[1]);
+
             if(is_redirect == 0){
                 // Process all arguments until the redirection
                 for(j = 0; j < i; j++){
                     prev_args[j] = input_args[j];
+                    printf("input_args[%d] = %s\n", j, input_args[j]);
                 }
             }
             is_redirect = 1;
+            
         }
         //store index of output redirection carrot
         if(strcmp(input_args[i], ">>") == 0){
@@ -278,11 +290,16 @@ void parse_user_input(char *input_args[], int fd_dup, int fd_close, int fd_dup1,
                 // Process all arguments until the redirection
                 for(j = 0; j < i; j++){
                     prev_args[j] = input_args[j];
+                    printf("input_args[%d] = %s\n", j, input_args[j]);
                 }
             }
             is_redirect = 1;
         }
         i++;
+    }
+
+    for(i = 0; i < MAX_NUMBER_ARGS; i++){
+        printf("prev_args[%d] = %s\n", i, prev_args[i]);
     }
 
     //if < provided
@@ -292,12 +309,15 @@ void parse_user_input(char *input_args[], int fd_dup, int fd_close, int fd_dup1,
         if(indices[1] != -1){ 
             output_index = indices[1];
 
+            printf("output index = %d\n", output_index);
             fd_out = open(input_args[output_index+1], O_CREAT | O_WRONLY | O_TRUNC, 0666);
             
             if(fd_out == -1){
                 perror("open");
             }
 
+            printf("input index = %d\n", input_index);
+            printf("input_args[input_index+1] = %s\n", input_args[input_index+1]);
             fd_in = open(input_args[input_index+1], O_RDONLY);
             
             if(fd_in == -1){
