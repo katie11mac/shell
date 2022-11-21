@@ -23,6 +23,9 @@ int main(int argc, char *argv[])
     return 0;
 }
 
+/*
+* Get the user input and separate it by pipes
+*/
 void get_user_input()
 {
     char original_user_input[INPUT_MAX_LENGTH];
@@ -76,7 +79,7 @@ void get_user_input()
             arg_index += 1;
         }
 
-        // parse_user_input(command_args); //handle <,>, and >>
+        //handle <, >, and >> and exec arguments
         parse_user_input(command_args , -1, -1, -1, -1);
 
     }
@@ -100,7 +103,7 @@ void get_user_input()
             perror("pipe");
         }
 
-        //Find input redirection and exec first command
+        //Find input redirection and exec first command 
         parse_user_input(command_args, pipe_fd1[1], pipe_fd1[0], -1, -1);
 
         //clear argument array
@@ -132,7 +135,7 @@ void get_user_input()
                 if(pipe(pipe_fd1) == -1){
                     perror("pipe");
                 }
-
+                
                 parse_user_input(command_args, pipe_fd1[1], pipe_fd1[0], pipe_fd2[0], pipe_fd2[1]);
             }
             //if j is odd replace contents of fd2
@@ -223,10 +226,15 @@ void get_user_input()
     }
 }
 
+/*
+* Parse the sections of the input for redirection (<, >, >>) and run the commands. 
+*/
 void parse_user_input(char *input_args[], int fd_dup, int fd_close, int fd_dup1, int fd_close1)
 {
     int i, j;
     int fd_in, fd_out;
+    // array for storing index of redirection symbols
+    //      indices[0]: index of <, indices[1]: index of >, indices[2]: index of >>
     int indices[3] = {-1,-1,-1};
     int is_redirect;
     int exit_value;
@@ -236,6 +244,7 @@ void parse_user_input(char *input_args[], int fd_dup, int fd_close, int fd_dup1,
     is_redirect = 0;
     i = 0;
 
+    //parse input_args and fill the indices array to know which redirections were provided 
     while(input_args[i] != NULL){
 
         //store index of input redirection carrot
@@ -276,10 +285,10 @@ void parse_user_input(char *input_args[], int fd_dup, int fd_close, int fd_dup1,
         i++;
     }
 
-    //if <
+    //if < provided
     if(indices[0] != -1){
         input_index = indices[0];
-        //if < and >
+        //if < and > provided 
         if(indices[1] != -1){ 
             output_index = indices[1];
 
@@ -317,7 +326,7 @@ void parse_user_input(char *input_args[], int fd_dup, int fd_close, int fd_dup1,
             close(fd_in);
             close(fd_out);
         }
-        //if < and >>
+        //if < and >> provided
         else if(indices[2] != -1){
             output_index = indices[2];
 
@@ -349,7 +358,7 @@ void parse_user_input(char *input_args[], int fd_dup, int fd_close, int fd_dup1,
                 }
             }
         }
-        //if only <
+        //if only < provided
         else{
             fd_in = open(input_args[input_index+1], O_RDONLY);
             
@@ -383,7 +392,7 @@ void parse_user_input(char *input_args[], int fd_dup, int fd_close, int fd_dup1,
             close(fd_in);
         }
     }
-    //if not <
+    //if no < provided
     else{
         //if >
         if(indices[1] != -1){
