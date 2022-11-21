@@ -12,12 +12,10 @@
 #define MAX_NUMBER_ARGS 10
 
 void get_user_input();
-void parse_user_input(char *input_args[]);
-char **reset_array(char *array[]);
+void parse_user_input(char *input_args[], int fd_dup, int fd_close, int fd_dup1, int fd_close1);
 
 int main(int argc, char *argv[])
 {
-
     for(;;)
     {
         get_user_input();
@@ -40,12 +38,6 @@ void get_user_input()
     
     int exit_value;
     int i;
-
-    int x, k; //index for checking for <
-    int fd; //fd for < and >>
-    static char *prev_args[MAX_NUMBER_ARGS]; //arg array for <
-
-    int is_redirect;
     int j;
 
     char *pipe_left_arg; //change this var name
@@ -94,7 +86,7 @@ void get_user_input()
         }
 
         // parse_user_input(command_args); //handle <,>, and >>
-        parse_user_input(command_args);
+        parse_user_input(command_args , -1, -1, -1, -1);
 
     }
     //IF THERE ARE PIPES
@@ -102,7 +94,7 @@ void get_user_input()
     {
         //1. HANDLE FIRST LEFT SIDE OF PIPE
 
-        //a. CREATE STRING ARRAY FOR LEFTMOST SIDE OF PIPE
+        //1a. CREATE STRING ARRAY FOR LEFTMOST SIDE OF PIPE
         pipe_left_arg = all_args[0];
         arg_index = 0; 
 
@@ -114,96 +106,19 @@ void get_user_input()
             arg_index += 1; 
         }
 
-        //b. pipe to create write and read end
+        //1b. pipe to create write and read end
         if(pipe(pipe_fd1) == -1)
         {
             perror("pipe");
         }
 
-        // CHECK FOR <
-        x = 0;
-        is_redirect = 0;
+        printf("first arg = %s\n", command_args[0]);
 
-        while(command_args[x] != NULL && is_redirect == 0)
-        {
-            // INPUT REDIRECTION
-            if(strcmp(command_args[x], "<") == 0)
-            {
-                printf("INPUT REDIRECTION \n");
-                fd = open(command_args[x+1], O_RDONLY);
-                
-                if(fd == -1)
-                {
-                    perror("open");
-                }
-
-                // Process all arguments until the redirection
-                for(k = 0; k < x; k++)
-                {
-                    prev_args[k] = command_args[k];
-                }
-
-                //process is the child
-                if(fork() == 0)
-                {
-                    //dup for input redirection
-                    if(dup2(fd, 0) == -1)
-                    {
-                        perror("dup2");
-                    }
-
-                    //dup for piping
-                    if((dup2(pipe_fd1[1], 1)) == -1)
-                    {
-                        perror("dup2");
-                    }
-
-                    close(pipe_fd1[0]);
-
-                    printf("execing %s 143\n", prev_args[0]);
-                    if(execvp(prev_args[0], prev_args) == -1)
-                    {
-                        perror("evecvp");
-                    }
-                }
-                //process is the parent
-                else
-                {
-                    wait(&exit_value);
-                }
-                
-                close(fd);
-
-                is_redirect = 1;
-            }
-            x++;
-        }
-
-        if(is_redirect == 0) //if not redirected, normal
-        {
-            printf("first arg = %s\n", command_args[0]);
-
-            //1c. fork for left side
-            if(fork() == 0)
-            {
-                if((dup2(pipe_fd1[1], 1)) == -1)
-                {
-                    perror("dup2");
-                }
-
-                close(pipe_fd1[0]);
-
-                printf("execing %s 213\n", command_args[0]);
-                if(execvp(command_args[0], command_args) == -1)
-                {
-                    perror("evecvp");
-                }
-            
-            }
-        }
+        //1c. Find input redirection and exec first command
+        parse_user_input(command_args, pipe_fd1[1], pipe_fd1[0], -1, -1);
 
         //1d. clear argument array
-        for(i = 0; i < MAX_NUMBER_ARGS; i++) //CHECK BUGS
+        for(i = 0; i < MAX_NUMBER_ARGS; i++)
         {
             command_args[i] = NULL;
         }
@@ -211,7 +126,6 @@ void get_user_input()
         //2. FOR LOOP TO HANDLE MIDDLE PIPES
         for(j = 1; j < all_args_index - 1; j++)
         {
-            
             //2a. get arg array
             pipe_left_arg = all_args[j];
             arg_index = 0; 
@@ -292,7 +206,6 @@ void get_user_input()
 
                     close(pipe_fd2[0]);
 
-                    printf("execing %s 13\n", command_args[0]);
                     if(execvp(command_args[0], command_args) == -1)
                     {
                         perror("evecvp");
@@ -328,6 +241,7 @@ void get_user_input()
 
         if((all_args_index % 2) == 0) //if last one is even we use fd1
         {
+            printf("even\n");
             printf("all_args_index = %d\n", all_args_index);
 
             if(all_args_index > 2)
@@ -336,92 +250,14 @@ void get_user_input()
                 close(pipe_fd2[1]);
             }
 
-            // CHECK FOR >
-            x = 0;
-            is_redirect = 0;
+            close(pipe_fd1[1]);
+            // parse user input for > or >>
+            parse_user_input(command_args, -1, -1, pipe_fd1[0], pipe_fd1[1]);
 
-            while(command_args[x] != NULL && is_redirect == 0) // change these
-            {
-                // OUTPUT REDIRECTION
-                if((strcmp(command_args[x], ">") == 0) || (strcmp(command_args[x], ">>") == 0)) //or >>
-                {
-                    printf("OUTPUT REDIRECTION\n");
-                    
-                    // put a >> check here so dont truncate
-                    if(strcmp(command_args[x], ">") == 0)
-                    {
-                        fd = open(command_args[x+1], O_CREAT | O_WRONLY | O_TRUNC, 0666);
-                    }
-                    else
-                    {
-                        fd = open(command_args[x+1], O_CREAT | O_WRONLY | O_APPEND, 0666);
-                    }
-                    
-                    if(fd == -1)
-                    {
-                        perror("open");
-                    }
-
-                    // Process all arguments until the redirection
-                    for(k = 0; k < x; k++)
-                    {
-                        prev_args[k] = command_args[k];
-                    }
-
-                    //process is the child
-                    if(fork() == 0)
-                    {
-                        if((dup2(fd, 1)) == -1)
-                        {
-                            perror("dup2");
-                        }
-
-                        if((dup2(pipe_fd1[0], 0)) == -1)
-                        {
-                            perror("dup2");
-                        }
-
-                        close(pipe_fd1[1]);
-
-                        printf("execing %s 123\n", prev_args[0]);
-                        if(execvp(prev_args[0], prev_args) == -1)
-                        {
-                            perror("evecvp");
-                        }
-                    }
-                    //process is the parent
-                    else
-                    {
-                        wait(&exit_value);
-                    }
-                    
-                    close(fd);
-
-                    is_redirect = 1;
-                }
-                x++;
-            }
-
-            if(is_redirect == 0)
-            {
-                printf("NO OUTPUT REDIRECTION\n");
-            
-                if(fork() == 0)
-                {
-                    if((dup2(pipe_fd1[0], 0)) == -1)
-                    {
-                        perror("dup2");
-                    }
-
-                    close(pipe_fd1[1]);
-
-                    if(execvp(command_args[0], command_args) == -1)
-                    {
-                        perror("evecvp");
-                    }
-                }
-            }
-        }
+            // close ends of pipes
+            close(pipe_fd1[0]);
+            close(pipe_fd1[1]);
+        }   
         else //if last one is odd we use fd2
         {
             printf("odd\n");
@@ -429,97 +265,16 @@ void get_user_input()
             close(pipe_fd1[0]);
             close(pipe_fd1[1]);
 
-            // CHECK FOR >
-            x = 0;
-            is_redirect = 0;
+            close(pipe_fd2[1]);
+            // parse user input for > or >>
+            parse_user_input(command_args, -1, -1, pipe_fd2[0], pipe_fd2[1]);
 
-            while(command_args[x] != NULL && is_redirect == 0) // change these
-            {
-                
-                // OUTPUT REDIRECTION
-                if((strcmp(command_args[x], ">") == 0) || (strcmp(command_args[x], ">>") == 0)) //or >>
-                {
-                    // put a >> check here so dont truncate
-                    if(strcmp(command_args[x], ">") == 0)
-                    {
-                        fd = open(command_args[x+1], O_CREAT | O_WRONLY | O_TRUNC, 0666);
-                    }
-                    else
-                    {
-                        fd = open(command_args[x+1], O_CREAT | O_WRONLY | O_APPEND, 0666);
-                    }
-                    
-                    if(fd == -1)
-                    {
-                        perror("open");
-                    }
-
-                    // Process all arguments until the redirection
-                    for(k = 0; k < x; k++)
-                    {
-                        prev_args[k] = command_args[k];
-                    }
-
-                    //process is the child
-                    if(fork() == 0)
-                    {
-                        if(dup2(fd, 1) == -1)
-                        {
-                            perror("dup2");
-                        }
-
-                        if((dup2(pipe_fd2[0], 0)) == -1)
-                        {
-                            perror("dup2");
-                        }
-
-                        close(pipe_fd2[1]);
-
-                        if(execvp(prev_args[0], prev_args) == -1)
-                        {
-                            perror("evecvp");
-                        }
-                    }
-                    //process is the parent
-                    else
-                    {
-                        wait(&exit_value);
-                    }
-                    
-                    close(fd);
-
-                    is_redirect = 1;
-                }
-                x++;
-            }
-            
-            if(is_redirect == 0)
-            {
-                if(fork() == 0)
-                {
-                    if((dup2(pipe_fd2[0], 0)) == -1)
-                    {
-                        perror("dup2");
-                    }
-
-                    close(pipe_fd2[1]);
-
-                    if(execvp(command_args[0], command_args) == -1)
-                    {
-                        perror("evecvp");
-                    }
-                }
-            }
-            
+            // close ends of pipe
+            close(pipe_fd2[0]);
+            close(pipe_fd2[1]);
         }
-
-        //4. close ends of pipe
-        close(pipe_fd1[0]);
-        close(pipe_fd1[1]);
-        close(pipe_fd2[0]);
-        close(pipe_fd2[1]);
         
-        //5. wait for each child
+        // wait for each child
         for(j = 0; j < all_args_index; j++)
         {
             wait(&exit_value);
@@ -527,7 +282,7 @@ void get_user_input()
     }
 }
 
-void parse_user_input(char *input_args[])
+void parse_user_input(char *input_args[], int fd_dup, int fd_close, int fd_dup1, int fd_close1)
 {
     int i, j;
     int fd_in, fd_out;
@@ -640,7 +395,7 @@ void parse_user_input(char *input_args[])
             close(fd_in);
             close(fd_out);
         }
-        //if also >>
+        //if < and >>
         else if(indices[2] != -1)
         {
             output_index = indices[2];
@@ -696,6 +451,16 @@ void parse_user_input(char *input_args[])
                     perror("dup2");
                 }
 
+                if(fd_dup != -1)
+                {
+                    if((dup2(fd_dup, 1)) == -1)
+                    {
+                        perror("dup2");
+                    }
+
+                    close(fd_close);  
+                }
+
                 if(execvp(prev_args[0], prev_args) == -1)
                 {
                     perror("evecvp");
@@ -734,6 +499,16 @@ void parse_user_input(char *input_args[])
                     perror("dup2");
                 }
 
+                if(fd_dup1 != -1)
+                {
+                    if((dup2(fd_dup1, 0)) == -1)
+                    {
+                        perror("dup2");
+                    }
+
+                    close(fd_close1);  
+                }
+
                 if(execvp(prev_args[0], prev_args) == -1)
                 {
                     perror("evecvp");
@@ -762,10 +537,19 @@ void parse_user_input(char *input_args[])
             //process is the child
             if(fork() == 0)
             {
-
                 if(dup2(fd_out, 1) == -1)
                 {
                     perror("dup2");
+                }
+               
+                if(fd_dup1 != -1)
+                {
+                    if((dup2(fd_dup1, 0)) == -1)
+                    {
+                        perror("dup2");
+                    }
+
+                    close(fd_close1);  
                 }
 
                 if(execvp(prev_args[0], prev_args) == -1)
@@ -786,9 +570,34 @@ void parse_user_input(char *input_args[])
     //if no redirection
     if(is_redirect == 0)
     {
+        printf("no redirection\n");
         //process is the child
         if(fork() == 0)
         {
+            if(fd_dup != -1)
+            {
+                printf("fd_dup = %d and fd_close = %d\n", fd_dup, fd_close);
+
+                if((dup2(fd_dup, 1)) == -1)
+                {
+                    perror("dup2");
+                }
+
+                close(fd_close);
+            }
+
+            if(fd_dup1 != -1)
+            {
+                printf("fd_dup1 = %d and fd_close1 = %d\n", fd_dup1, fd_close1);
+                
+                if((dup2(fd_dup1, 0)) == -1)
+                {
+                    perror("dup2");
+                }
+
+                close(fd_close1);
+            }
+
             if(execvp(input_args[0], input_args) == -1)
             {
                 perror("evecvp");
