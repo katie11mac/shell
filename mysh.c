@@ -11,13 +11,13 @@
 #define INPUT_MAX_LENGTH 4096
 #define MAX_NUMBER_ARGS 10
 
-void get_user_input();
-void parse_user_input(char *input_args[], int fd_dup, int fd_close, int fd_dup1, int fd_close1);
+void separate_input_pipes();
+void process_redirection(char *input_args[], int fd_dup, int fd_close, int fd_dup1, int fd_close1);
 
 int main(int argc, char *argv[])
 {
     for(;;){
-        get_user_input();
+        separate_input_pipes();
     }
 
     return 0;
@@ -26,7 +26,7 @@ int main(int argc, char *argv[])
 /*
 * Get the user input and separate it by pipes
 */
-void get_user_input()
+void separate_input_pipes()
 {
     char original_user_input[INPUT_MAX_LENGTH];
     char *edited_user_input;
@@ -80,7 +80,7 @@ void get_user_input()
         }
 
         //handle <, >, and >> and exec arguments
-        parse_user_input(command_args , -1, -1, -1, -1);
+        process_redirection(command_args , -1, -1, -1, -1);
 
     }
     //IF THERE ARE PIPES
@@ -104,7 +104,7 @@ void get_user_input()
         }
 
         //Find input redirection and exec first command 
-        parse_user_input(command_args, pipe_fd1[1], pipe_fd1[0], -1, -1);
+        process_redirection(command_args, pipe_fd1[1], pipe_fd1[0], -1, -1);
 
         //clear argument array
         for(i = 0; i < MAX_NUMBER_ARGS; i++){
@@ -136,7 +136,7 @@ void get_user_input()
                     perror("pipe");
                 }
                 
-                parse_user_input(command_args, pipe_fd1[1], pipe_fd1[0], pipe_fd2[0], pipe_fd2[1]);
+                process_redirection(command_args, pipe_fd1[1], pipe_fd1[0], pipe_fd2[0], pipe_fd2[1]);
             }
             //if j is odd replace contents of fd2
             else{
@@ -199,7 +199,7 @@ void get_user_input()
 
             close(pipe_fd1[1]);
             // parse user input for > or >>
-            parse_user_input(command_args, -1, -1, pipe_fd1[0], pipe_fd1[1]);
+            process_redirection(command_args, -1, -1, pipe_fd1[0], pipe_fd1[1]);
 
             // close ends of pipes
             close(pipe_fd1[0]);
@@ -212,7 +212,7 @@ void get_user_input()
 
             close(pipe_fd2[1]);
             // parse user input for > or >>
-            parse_user_input(command_args, -1, -1, pipe_fd2[0], pipe_fd2[1]);
+            process_redirection(command_args, -1, -1, pipe_fd2[0], pipe_fd2[1]);
 
             // close ends of pipe
             close(pipe_fd2[0]);
@@ -229,7 +229,7 @@ void get_user_input()
 /*
 * Parse the sections of the input for redirection (<, >, >>) and run the commands. 
 */
-void parse_user_input(char *input_args[], int fd_dup, int fd_close, int fd_dup1, int fd_close1)
+void process_redirection(char *input_args[], int fd_dup, int fd_close, int fd_dup1, int fd_close1)
 {
     int i, j;
     int fd_in, fd_out;
