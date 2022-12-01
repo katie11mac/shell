@@ -1,3 +1,5 @@
+#!/bin/bash
+
 ls
 wc -w < input.txt
 rm output.txt

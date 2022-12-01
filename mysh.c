@@ -135,10 +135,12 @@ void separate_input_pipes()
                 //close previous fds
                 if(j >= 2){
                     if(close(pipe_fd1[0]) == -1){
-                        perror("close"); 
+                        perror("close");
+                        exit(1);
                     }
                     if(close(pipe_fd1[1]) == -1){
                         perror("close");
+                        exit(1);
                     }
                 }
                 if(pipe(pipe_fd1) == -1){
@@ -153,10 +155,12 @@ void separate_input_pipes()
                 //close previous fds
                 if(j >= 2){
                     if(close(pipe_fd2[0]) == -1){
-                        perror("close"); 
+                        perror("close");
+                        exit(1);
                     }
                     if(close(pipe_fd2[1]) == -1){
                         perror("close");
+                        exit(1);
                     }
                 }
                 
@@ -173,7 +177,8 @@ void separate_input_pipes()
                     }
                     //close write end
                     if(close(pipe_fd1[1]) == -1){
-                        perror("close"); 
+                        perror("close");
+                        exit(1);
                     }
 
                     //write to write end of pipe
@@ -183,7 +188,8 @@ void separate_input_pipes()
                     }
 
                     if(close(pipe_fd2[0]) == -1){
-                        perror("close"); 
+                        perror("close");
+                        exit(1);
                     }
 
                     if(execvp(command_args[0], command_args) == -1){
@@ -217,47 +223,57 @@ void separate_input_pipes()
             if(all_args_index > 2){
                 if(close(pipe_fd2[0]) == -1){
                     perror("close");
+                    exit(1);
                 }
                 if(close(pipe_fd2[1]) == -1){
                     perror("close");
+                    exit(1);
                 }
             }
 
             if(close(pipe_fd1[1]) == -1){
-                perror("close");
+                perror("close1");
+                exit(1);
             }
             // parse user input for > or >>
             process_redirection(command_args, -1, -1, pipe_fd1[0], pipe_fd1[1]);
 
             // close ends of pipes
             if(close(pipe_fd1[0]) == -1){
-                perror("close"); 
+                perror("close2");
+                exit(1);
             }
             if(close(pipe_fd1[1]) == -1){
-                perror("close");
+                perror("close3");
+                exit(1);
             }
         }
         //if last one is odd we use fd2
         else{
             if(close(pipe_fd1[0]) == -1){
-                perror("close"); 
+                perror("close");
+                exit(1);
             }
             if(close(pipe_fd1[1]) == -1){
                 perror("close");
+                exit(1);
             }
 
             if(close(pipe_fd2[1]) == -1){
                 perror("close");
+                exit(1);
             }
             // parse user input for > or >>
             process_redirection(command_args, -1, -1, pipe_fd2[0], pipe_fd2[1]);
 
             // close ends of pipe
             if(close(pipe_fd2[0]) == -1){
-                perror("close"); 
+                perror("close");
+                exit(1);
             }
             if(close(pipe_fd2[1]) == -1){
                 perror("close");
+                exit(1);
             }
         }
         
@@ -265,6 +281,7 @@ void separate_input_pipes()
         for(j = 0; j < all_args_index; j++){
             if(wait(&exit_value) == -1){
                 perror("wait");
+                exit(1);
             }
         }
     }
@@ -285,6 +302,7 @@ void process_redirection(char *input_args[], int fd_dup, int fd_close, int fd_du
     static char *prev_args[MAX_NUMBER_ARGS];
     int input_index, output_index;
 
+    printf("calling process_redir \n");
     //clear prev_args array
     for(i = 0; i < MAX_NUMBER_ARGS; i++){
         prev_args[i] = '\0';
@@ -378,14 +396,17 @@ void process_redirection(char *input_args[], int fd_dup, int fd_close, int fd_du
             else{
                 if(wait(&exit_value) == -1){
                     perror("wait");
+                    exit(1);
                 }
             }
             
             if(close(fd_in) == -1){
-                perror("close"); 
+                perror("close");
+                exit(1);
             }
             if(close(fd_out) == -1){
-                perror("close"); 
+                perror("close");
+                exit(1);
             }
         }
         //if < and >> provided
@@ -396,12 +417,14 @@ void process_redirection(char *input_args[], int fd_dup, int fd_close, int fd_du
             
             if(fd_out == -1){
                 perror("open");
+                exit(1);
             }
 
             fd_in = open(input_args[input_index+1], O_RDONLY);
             
             if(fd_in == -1){
                 perror("open");
+                exit(1);
             }
 
             //process is the child
@@ -409,14 +432,17 @@ void process_redirection(char *input_args[], int fd_dup, int fd_close, int fd_du
 
                 if(dup2(fd_in, 0) == -1){
                     perror("dup2");
+                    exit(1);
                 }
 
                 if(dup2(fd_out, 1) == -1){
                     perror("dup2");
+                    exit(1);
                 }
 
                 if(execvp(prev_args[0], prev_args) == -1){
                     perror("evecvp");
+                    exit(1);
                 }
             }
         }
@@ -426,37 +452,44 @@ void process_redirection(char *input_args[], int fd_dup, int fd_close, int fd_du
             
             if(fd_in == -1){
                 perror("open");
+                exit(1);
             }
 
             //process is the child
             if(fork() == 0){
                 if(dup2(fd_in, 0) == -1){
                     perror("dup2");
+                    exit(1);
                 }
 
                 if(fd_dup != -1){
                     if((dup2(fd_dup, 1)) == -1){
                         perror("dup2");
+                        exit(1);
                     }
 
                     if(close(fd_close) == -1){
                         perror("close");
+                        exit(1);
                     }
                 }
 
                 if(execvp(prev_args[0], prev_args) == -1){
                     perror("evecvp");
+                    exit(1);
                 }
             }
             //process is the parent
             else{
                 if(wait(&exit_value) == -1){
                     perror("wait");
+                    exit(1);
                 }
             }
             
             if(close(fd_in) == -1){
                 perror("close");
+                exit(1);
             }
         }
     }
@@ -470,6 +503,7 @@ void process_redirection(char *input_args[], int fd_dup, int fd_close, int fd_du
             
             if(fd_out == -1){
                 perror("open");
+                exit(1);
             }
 
             //process is the child
@@ -477,31 +511,37 @@ void process_redirection(char *input_args[], int fd_dup, int fd_close, int fd_du
 
                 if(dup2(fd_out, 1) == -1){
                     perror("dup2");
+                    exit(1);
                 }
 
                 if(fd_dup1 != -1){
                     if((dup2(fd_dup1, 0)) == -1){
                         perror("dup2");
+                        exit(1);
                     }
 
                     if(close(fd_close1) == -1){
                         perror("close");
+                        exit(1);
                     }
                 }
 
                 if(execvp(prev_args[0], prev_args) == -1){
                     perror("evecvp");
+                    exit(1);
                 }
             }
             //process is the parent
             else{
                 if(wait(&exit_value) == -1){
                     perror("wait");
+                    exit(1);
                 }            
             }
             
             if(close(fd_out) == -1){
                 perror("close");
+                exit(1);
             }
         }
         //if >>
@@ -512,37 +552,44 @@ void process_redirection(char *input_args[], int fd_dup, int fd_close, int fd_du
             
             if(fd_out == -1){
                 perror("open");
+                exit(1);
             }
 
             //process is the child
             if(fork() == 0){
                 if(dup2(fd_out, 1) == -1){
                     perror("dup2");
+                    exit(1);
                 }
                
                 if(fd_dup1 != -1){
                     if((dup2(fd_dup1, 0)) == -1){
                         perror("dup2");
+                        exit(1);
                     }
 
                     if(close(fd_close1) == -1){
                         perror("close");
+                        exit(1);
                     }
                 }
 
                 if(execvp(prev_args[0], prev_args) == -1){
                     perror("evecvp");
+                    exit(1);
                 }
             }
             //process is the parent
             else{
                 if(wait(&exit_value) == -1){
                     perror("wait");
+                    exit(1);
                 }
             }
             
             if(close(fd_out) == -1){
                 perror("close");
+                exit(1);
             }
         }
     }
@@ -554,30 +601,37 @@ void process_redirection(char *input_args[], int fd_dup, int fd_close, int fd_du
             if(fd_dup != -1){
                 if((dup2(fd_dup, 1)) == -1){
                     perror("dup2");
+                    exit(1);
                 }
 
                 if(close(fd_close) == -1){
-                    perror("close");
+                    perror("close4");
+                    exit(1);
                 }
             }
+            printf("fd_dup1 = %d\n", fd_dup1);
 
             if(fd_dup1 != -1){
                 if((dup2(fd_dup1, 0)) == -1){
                     perror("dup2");
+                    exit(1);
                 }
                 if(close(fd_close1) == -1){
-                    perror("close");
+                    perror("close5");
+                    exit(1);
                 }
             }
 
             if(execvp(input_args[0], input_args) == -1){
                 perror("evecvp");
+                exit(1);
             }
         }
         //process is the parent
         else{
             if(wait(&exit_value) == -1){
                 perror("wait");
+                exit(1);
             }
         }
     }
