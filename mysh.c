@@ -49,13 +49,17 @@ void separate_input_pipes()
 
     //print prompt and get user input
     printf("$ ");
-    fgets(original_user_input, INPUT_MAX_LENGTH, stdin);
+
+    // Get user input text and check if EOF or control D
+    if(fgets(original_user_input, INPUT_MAX_LENGTH, stdin) == NULL){
+        exit(0);
+    }
 
     //get rid of \n character
     edited_user_input = strtok(original_user_input, "\n");
 
     //check if command is exit
-    if(strcmp(edited_user_input, "exit") == 0){
+    if((strcmp(edited_user_input, "exit") == 0)){
         exit(0);
     }
 
