@@ -12,7 +12,7 @@
 #define MAX_NUMBER_ARGS 10
 
 void separate_input_pipes();
-void process_redirection(char *input_args[], int fd_dup, int fd_close, int fd_dup1, int fd_close1);
+int process_redirection(char *input_args[], int fd_dup, int fd_close, int fd_dup1, int fd_close1);
 
 int main(int argc, char *argv[])
 {
@@ -84,7 +84,10 @@ void separate_input_pipes()
         }
 
         //handle <, >, and >> and exec arguments
-        process_redirection(command_args , -1, -1, -1, -1);
+        if(process_redirection(command_args , -1, -1, -1, -1) != 0){
+            printf("we get here\n");
+            exit(1);
+        }
 
     }
     //IF THERE ARE PIPES
@@ -108,18 +111,109 @@ void separate_input_pipes()
             exit(1);
         }
 
-        //Find input redirection and exec first command 
-        process_redirection(command_args, pipe_fd1[1], pipe_fd1[0], -1, -1);
+        //Find input redirection and exec first command, only continue if this exits successfully
+        if(process_redirection(command_args, pipe_fd1[1], pipe_fd1[0], -1, -1) == 0){
 
-        //clear argument array
-        for(i = 0; i < MAX_NUMBER_ARGS; i++){
-            command_args[i] = NULL;
-        }
+            //clear argument array
+            for(i = 0; i < MAX_NUMBER_ARGS; i++){
+                command_args[i] = NULL;
+            }
 
-        //FOR LOOP TO HANDLE MIDDLE PIPES
-        for(j = 1; j < all_args_index - 1; j++){
+            //FOR LOOP TO HANDLE MIDDLE PIPES
+            for(j = 1; j < all_args_index - 1; j++){
+                //get arg array
+                sec_of_command = all_args[j];
+                arg_index = 0;
+
+                command_args[arg_index] = strtok(sec_of_command, " ");
+                arg_index += 1;
+
+                while((command_args[arg_index] = strtok(NULL, " ")) != NULL){
+                    arg_index += 1; 
+                }
+
+                //if j is even replace contents of fd1
+                if((j % 2) == 0){
+
+                    //close previous fds
+                    if(j >= 2){
+                        if(close(pipe_fd1[0]) == -1){
+                            perror("close");
+                            exit(1);
+                        }
+                        if(close(pipe_fd1[1]) == -1){
+                            perror("close");
+                            exit(1);
+                        }
+                    }
+                    if(pipe(pipe_fd1) == -1){
+                        perror("pipe");
+                        exit(1);
+                    }
+                    
+                    if(process_redirection(command_args, pipe_fd1[1], pipe_fd1[0], pipe_fd2[0], pipe_fd2[1]) == -1){
+                        exit(1);
+                    }
+                }
+                //if j is odd replace contents of fd2
+                else{
+                    //close previous fds
+                    if(j >= 2){
+                        if(close(pipe_fd2[0]) == -1){
+                            perror("close");
+                            exit(1);
+                        }
+                        if(close(pipe_fd2[1]) == -1){
+                            perror("close");
+                            exit(1);
+                        }
+                    }
+                    
+                    if(pipe(pipe_fd2) == -1){
+                        perror("pipe");
+                        exit(1);
+                    }
+
+                    if(fork() == 0){
+                        //read from read end
+                        if((dup2(pipe_fd1[0], 0)) == -1) {
+                            perror("dup2");
+                            exit(1);
+                        }
+                        //close write end
+                        if(close(pipe_fd1[1]) == -1){
+                            perror("close");
+                            exit(1);
+                        }
+
+                        //write to write end of pipe
+                        if((dup2(pipe_fd2[1], 1)) == -1){
+                            perror("dup2");
+                            exit(1);
+                        }
+
+                        if(close(pipe_fd2[0]) == -1){
+                            perror("close");
+                            exit(1);
+                        }
+
+                        if(execvp(command_args[0], command_args) == -1){
+                            perror("evecvp");
+                            exit(1);
+                        }
+                    
+                    }
+                }
+                //clears the command args array
+                for(i = 0; i < MAX_NUMBER_ARGS; i++){
+                    command_args[i] = NULL;
+                }
+
+            }
+
+            //HANDLE LAST RIGHT SIDE OF PIPE
             //get arg array
-            sec_of_command = all_args[j];
+            sec_of_command = all_args[all_args_index-1];
             arg_index = 0;
 
             command_args[arg_index] = strtok(sec_of_command, " ");
@@ -129,31 +223,9 @@ void separate_input_pipes()
                 arg_index += 1; 
             }
 
-            //if j is even replace contents of fd1
-            if((j % 2) == 0){
-
-                //close previous fds
-                if(j >= 2){
-                    if(close(pipe_fd1[0]) == -1){
-                        perror("close");
-                        exit(1);
-                    }
-                    if(close(pipe_fd1[1]) == -1){
-                        perror("close");
-                        exit(1);
-                    }
-                }
-                if(pipe(pipe_fd1) == -1){
-                    perror("pipe");
-                    exit(1);
-                }
-                
-                process_redirection(command_args, pipe_fd1[1], pipe_fd1[0], pipe_fd2[0], pipe_fd2[1]);
-            }
-            //if j is odd replace contents of fd2
-            else{
-                //close previous fds
-                if(j >= 2){
+            //if last one is even we use fd1
+            if((all_args_index % 2) == 0){
+                if(all_args_index > 2){
                     if(close(pipe_fd2[0]) == -1){
                         perror("close");
                         exit(1);
@@ -163,63 +235,68 @@ void separate_input_pipes()
                         exit(1);
                     }
                 }
-                
-                if(pipe(pipe_fd2) == -1){
-                    perror("pipe");
+
+                if(close(pipe_fd1[1]) == -1){
+                    perror("close1");
+                    exit(1);
+                }
+                // parse user input for > or >>
+                if(process_redirection(command_args, -1, -1, pipe_fd1[0], pipe_fd1[1]) != 0){
                     exit(1);
                 }
 
-                if(fork() == 0){
-                    //read from read end
-                    if((dup2(pipe_fd1[0], 0)) == -1) {
-                        perror("dup2");
-                        exit(1);
-                    }
-                    //close write end
-                    if(close(pipe_fd1[1]) == -1){
-                        perror("close");
-                        exit(1);
-                    }
-
-                    //write to write end of pipe
-                    if((dup2(pipe_fd2[1], 1)) == -1){
-                        perror("dup2");
-                        exit(1);
-                    }
-
-                    if(close(pipe_fd2[0]) == -1){
-                        perror("close");
-                        exit(1);
-                    }
-
-                    if(execvp(command_args[0], command_args) == -1){
-                        perror("evecvp");
-                        exit(1);
-                    }
-                
+                // close ends of pipes
+                if(close(pipe_fd1[0]) == -1){
+                    perror("close2");
+                    exit(1);
+                }
+                if(close(pipe_fd1[1]) == -1){
+                    perror("close3");
+                    exit(1);
                 }
             }
-            //clears the command args array
-            for(i = 0; i < MAX_NUMBER_ARGS; i++){
-                command_args[i] = NULL;
+            //if last one is odd we use fd2
+            else{
+                if(close(pipe_fd1[0]) == -1){
+                    perror("close");
+                    exit(1);
+                }
+                if(close(pipe_fd1[1]) == -1){
+                    perror("close");
+                    exit(1);
+                }
+
+                if(close(pipe_fd2[1]) == -1){
+                    perror("close");
+                    exit(1);
+                }
+                // parse user input for > or >>
+                if(process_redirection(command_args, -1, -1, pipe_fd2[0], pipe_fd2[1]) != 0){
+                    exit(1);
+                }
+
+                // close ends of pipe
+                if(close(pipe_fd2[0]) == -1){
+                    perror("close");
+                    exit(1);
+                }
+                if(close(pipe_fd2[1]) == -1){
+                    perror("close");
+                    exit(1);
+                }
             }
-
+            
+            // wait for each child
+            for(j = 0; j < all_args_index; j++){
+                if(wait(&exit_value) == -1){
+                    perror("wait");
+                    exit(1);
+                }
+            }
         }
-
-        //HANDLE LAST RIGHT SIDE OF PIPE
-        //get arg array
-        sec_of_command = all_args[all_args_index-1];
-        arg_index = 0;
-
-        command_args[arg_index] = strtok(sec_of_command, " ");
-        arg_index += 1;
-
-        while((command_args[arg_index] = strtok(NULL, " ")) != NULL){
-            arg_index += 1; 
-        }
-
-        //if last one is even we use fd1
-        if((all_args_index % 2) == 0){
+        else{
+            printf("we return correctly\n");
+            //close appropriate fds
             if(all_args_index > 2){
                 if(close(pipe_fd2[0]) == -1){
                     perror("close");
@@ -230,15 +307,6 @@ void separate_input_pipes()
                     exit(1);
                 }
             }
-
-            if(close(pipe_fd1[1]) == -1){
-                perror("close1");
-                exit(1);
-            }
-            // parse user input for > or >>
-            process_redirection(command_args, -1, -1, pipe_fd1[0], pipe_fd1[1]);
-
-            // close ends of pipes
             if(close(pipe_fd1[0]) == -1){
                 perror("close2");
                 exit(1);
@@ -247,42 +315,8 @@ void separate_input_pipes()
                 perror("close3");
                 exit(1);
             }
-        }
-        //if last one is odd we use fd2
-        else{
-            if(close(pipe_fd1[0]) == -1){
-                perror("close");
-                exit(1);
-            }
-            if(close(pipe_fd1[1]) == -1){
-                perror("close");
-                exit(1);
-            }
-
-            if(close(pipe_fd2[1]) == -1){
-                perror("close");
-                exit(1);
-            }
-            // parse user input for > or >>
-            process_redirection(command_args, -1, -1, pipe_fd2[0], pipe_fd2[1]);
-
-            // close ends of pipe
-            if(close(pipe_fd2[0]) == -1){
-                perror("close");
-                exit(1);
-            }
-            if(close(pipe_fd2[1]) == -1){
-                perror("close");
-                exit(1);
-            }
-        }
-        
-        // wait for each child
-        for(j = 0; j < all_args_index; j++){
-            if(wait(&exit_value) == -1){
-                perror("wait");
-                exit(1);
-            }
+            
+            exit(1);
         }
     }
 }
@@ -290,7 +324,7 @@ void separate_input_pipes()
 /*
 * Parse the sections of the input for redirection (<, >, >>) and run the commands. 
 */
-void process_redirection(char *input_args[], int fd_dup, int fd_close, int fd_dup1, int fd_close1)
+int process_redirection(char *input_args[], int fd_dup, int fd_close, int fd_dup1, int fd_close1)
 {
     int i, j;
     int fd_in, fd_out;
@@ -372,7 +406,7 @@ void process_redirection(char *input_args[], int fd_dup, int fd_close, int fd_du
             
             if(fd_in == -1){
                 perror("open");
-                exit(1);
+                return -1;
             }
 
             //process is the child
@@ -389,7 +423,7 @@ void process_redirection(char *input_args[], int fd_dup, int fd_close, int fd_du
 
                 if(execvp(prev_args[0], prev_args) == -1){
                     perror("evecvp");
-                    exit(1);
+                    return -1;
                 }
             }
             //process is the parent
@@ -442,7 +476,7 @@ void process_redirection(char *input_args[], int fd_dup, int fd_close, int fd_du
 
                 if(execvp(prev_args[0], prev_args) == -1){
                     perror("evecvp");
-                    exit(1);
+                    return -1;
                 }
             }
         }
@@ -452,7 +486,7 @@ void process_redirection(char *input_args[], int fd_dup, int fd_close, int fd_du
             
             if(fd_in == -1){
                 perror("open");
-                exit(1);
+                return -1;
             }
 
             //process is the child
@@ -476,7 +510,7 @@ void process_redirection(char *input_args[], int fd_dup, int fd_close, int fd_du
 
                 if(execvp(prev_args[0], prev_args) == -1){
                     perror("evecvp");
-                    exit(1);
+                    return -1;
                 }
             }
             //process is the parent
@@ -503,7 +537,7 @@ void process_redirection(char *input_args[], int fd_dup, int fd_close, int fd_du
             
             if(fd_out == -1){
                 perror("open");
-                exit(1);
+                return -1;
             }
 
             //process is the child
@@ -528,7 +562,7 @@ void process_redirection(char *input_args[], int fd_dup, int fd_close, int fd_du
 
                 if(execvp(prev_args[0], prev_args) == -1){
                     perror("evecvp");
-                    exit(1);
+                    return -1;
                 }
             }
             //process is the parent
@@ -552,7 +586,7 @@ void process_redirection(char *input_args[], int fd_dup, int fd_close, int fd_du
             
             if(fd_out == -1){
                 perror("open");
-                exit(1);
+                return -1;
             }
 
             //process is the child
@@ -576,7 +610,7 @@ void process_redirection(char *input_args[], int fd_dup, int fd_close, int fd_du
 
                 if(execvp(prev_args[0], prev_args) == -1){
                     perror("evecvp");
-                    exit(1);
+                    return -1;
                 }
             }
             //process is the parent
@@ -624,7 +658,7 @@ void process_redirection(char *input_args[], int fd_dup, int fd_close, int fd_du
 
             if(execvp(input_args[0], input_args) == -1){
                 perror("evecvp");
-                exit(1);
+                return -1;
             }
         }
         //process is the parent
@@ -635,5 +669,7 @@ void process_redirection(char *input_args[], int fd_dup, int fd_close, int fd_du
             }
         }
     }
+
+    return 0;
 }
 
