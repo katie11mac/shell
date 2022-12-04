@@ -75,6 +75,8 @@ void separate_input_pipes()
         sec_of_command = all_args[0];
         arg_index = 0;
 
+
+        // -----CAN WE MAKE THIS A FUNCTION------
         //seperates each argument
         command_args[arg_index] = strtok(sec_of_command, " ");
         arg_index += 1;
@@ -82,6 +84,7 @@ void separate_input_pipes()
         while((command_args[arg_index] = strtok(NULL, " ")) != NULL){
             arg_index += 1;
         }
+        //----------------------------------------
 
         //handle <, >, and >> and exec arguments
         if(process_redirection(command_args , -1, -1, -1, -1) != 0){
@@ -97,6 +100,7 @@ void separate_input_pipes()
         sec_of_command = all_args[0];
         arg_index = 0;
 
+        // -----CAN WE MAKE THIS A FUNCTION------
         //seperates each argument
         command_args[arg_index] = strtok(sec_of_command, " ");
         arg_index += 1;
@@ -104,6 +108,7 @@ void separate_input_pipes()
         while((command_args[arg_index] = strtok(NULL, " ")) != NULL){
             arg_index += 1;
         }
+        //----------------------------------------
 
         //pipe to create write and read end
         if(pipe(pipe_fd1) == -1){
@@ -125,18 +130,21 @@ void separate_input_pipes()
                 sec_of_command = all_args[j];
                 arg_index = 0;
 
+                // -----CAN WE MAKE THIS A FUNCTION------
                 command_args[arg_index] = strtok(sec_of_command, " ");
                 arg_index += 1;
 
                 while((command_args[arg_index] = strtok(NULL, " ")) != NULL){
                     arg_index += 1; 
                 }
+                // ---------------------------------------
 
                 //if j is even replace contents of fd1
                 if((j % 2) == 0){
-
+                    
                     //close previous fds
                     if(j >= 2){
+                        //-----THE BELOW CAN ALSO PROBABLY BE A FUNCTION w param pipe_fd
                         if(close(pipe_fd1[0]) == -1){
                             perror("close");
                             exit(1);
@@ -159,6 +167,7 @@ void separate_input_pipes()
                 else{
                     //close previous fds
                     if(j >= 2){
+                        //-----THE BELOW CAN ALSO PROBABLY BE A FUNCTION w param pipe_fd
                         if(close(pipe_fd2[0]) == -1){
                             perror("close");
                             exit(1);
@@ -351,6 +360,7 @@ int process_redirection(char *input_args[], int fd_dup, int fd_close, int fd_dup
         //store index of input redirection carrot
         if(strcmp(input_args[i], "<") == 0){
             indices[0] = i;
+            //----CAN THIS ALSO BE A FUNCTION?---
             //if this is the first redirect, process the commands
             if(is_redirect == 0){
                 // Process all arguments until the redirection
@@ -359,6 +369,7 @@ int process_redirection(char *input_args[], int fd_dup, int fd_close, int fd_dup
                 }
                 is_redirect = 1;
             }
+            //--------------------------------
             
         }
         
@@ -366,6 +377,7 @@ int process_redirection(char *input_args[], int fd_dup, int fd_close, int fd_dup
         if((strcmp(input_args[i], ">") == 0)) {
             indices[1] = i;
 
+            //----CAN THIS ALSO BE A FUNCTION?---
             if(is_redirect == 0){
                 // Process all arguments until the redirection
                 for(j = 0; j < i; j++){
@@ -373,11 +385,14 @@ int process_redirection(char *input_args[], int fd_dup, int fd_close, int fd_dup
                 }
             }
             is_redirect = 1;
+            //--------------------------------
             
         }
         //store index of output redirection carrot
         if(strcmp(input_args[i], ">>") == 0){
             indices[2] = i;
+
+            //----CAN THIS ALSO BE A FUNCTION?---
             if(is_redirect == 0){
                 // Process all arguments until the redirection
                 for(j = 0; j < i; j++){
@@ -385,6 +400,7 @@ int process_redirection(char *input_args[], int fd_dup, int fd_close, int fd_dup
                 }
             }
             is_redirect = 1;
+            //--------------------------------
         }
         i++;
     }
