@@ -12,7 +12,7 @@
 #define MAX_NUMBER_ARGS 10
 
 void separate_input_pipes();
-int process_redirection(char *input_args[], int fd_dup, int fd_close, int fd_dup1, int fd_close1);
+int process_redirection(char *input_args[], int write_fd1, int read_fd1, int write_fd2, int read_fd2);
 
 int main(int argc, char *argv[])
 {
@@ -44,8 +44,13 @@ void separate_input_pipes()
     //section being one part the command on either side of the pipe (only one section w/o pipes)
     char *sec_of_command;
     //write and read ends of pipe
-    int pipe_fd1[2];
-    int pipe_fd2[2];
+    int read_fd1;
+    int write_fd1;
+    int read_fd2;
+    int write_fd2;
+    // int pipe_fd1[2];
+    // int pipe_fd2[2];
+    int pipe_fds[2];
 
     //print prompt and get user input
     printf("$ ");
@@ -111,13 +116,15 @@ void separate_input_pipes()
         //----------------------------------------
 
         //pipe to create write and read end
-        if(pipe(pipe_fd1) == -1){
+        if(pipe(pipe_fds) == -1){
             perror("pipe");
             exit(1);
         }
+        read_fd1 = pipe_fds[0];
+        write_fd1 = pipe_fds[1];
 
         //Find input redirection and exec first command, only continue if this exits successfully
-        if(process_redirection(command_args, pipe_fd1[1], pipe_fd1[0], -1, -1) == 0){
+        if(process_redirection(command_args, write_fd1, read_fd1, -1, -1) == 0){
 
             //clear argument array
             for(i = 0; i < MAX_NUMBER_ARGS; i++){
@@ -145,21 +152,24 @@ void separate_input_pipes()
                     //close previous fds
                     if(j >= 2){
                         //-----THE BELOW CAN ALSO PROBABLY BE A FUNCTION w param pipe_fd
-                        if(close(pipe_fd1[0]) == -1){
+                        if(close(read_fd1) == -1){
                             perror("close");
                             exit(1);
                         }
-                        if(close(pipe_fd1[1]) == -1){
+
+                        if(close(write_fd2) == -1){
                             perror("close");
                             exit(1);
                         }
                     }
-                    if(pipe(pipe_fd1) == -1){
+                    if(pipe(pipe_fds) == -1){
                         perror("pipe");
                         exit(1);
                     }
+                    read_fd1 = pipe_fds[0];
+                    write_fd1 = pipe_fds[1];
                     
-                    if(process_redirection(command_args, pipe_fd1[1], pipe_fd1[0], pipe_fd2[0], pipe_fd2[1]) == -1){
+                    if(process_redirection(command_args, write_fd1, read_fd1, write_fd2, read_fd2) == -1){
                         exit(1);
                     }
                 }
@@ -168,49 +178,58 @@ void separate_input_pipes()
                     //close previous fds
                     if(j >= 2){
                         //-----THE BELOW CAN ALSO PROBABLY BE A FUNCTION w param pipe_fd
-                        if(close(pipe_fd2[0]) == -1){
+                        if(close(read_fd2) == -1){
                             perror("close");
                             exit(1);
                         }
-                        if(close(pipe_fd2[1]) == -1){
+                        if(close(write_fd2) == -1){
                             perror("close");
                             exit(1);
                         }
                     }
                     
-                    if(pipe(pipe_fd2) == -1){
-                        perror("pipe");
+                    //close write end, so we don't have to close in child
+                    if(close(write_fd1) == -1){
+                        perror("close");
                         exit(1);
                     }
 
+                    if(pipe(pipe_fds) == -1){
+                        perror("pipe");
+                        exit(1);
+                    }
+                    read_fd2 = pipe_fds[0];
+                    write_fd2 = pipe_fds[1];
+
                     if(fork() == 0){
                         //read from read end
-                        if((dup2(pipe_fd1[0], 0)) == -1) {
+                        if((dup2(read_fd1, 0)) == -1) {
                             perror("dup2");
-                            exit(1);
-                        }
-                        //close write end
-                        if(close(pipe_fd1[1]) == -1){
-                            perror("close");
                             exit(1);
                         }
 
                         //write to write end of pipe
-                        if((dup2(pipe_fd2[1], 1)) == -1){
+                        if((dup2(write_fd2, 1)) == -1){
                             perror("dup2");
                             exit(1);
                         }
 
-                        if(close(pipe_fd2[0]) == -1){
-                            perror("close");
-                            exit(1);
-                        }
+                        // if(close(read_fd2) == -1){
+                        //     perror("close");
+                        //     exit(1);
+                        // }
 
                         if(execvp(command_args[0], command_args) == -1){
                             perror("evecvp");
                             exit(1);
                         }
                     
+                    }
+                    else{
+                        if(wait(&exit_value) == -1){
+                            perror("wait");
+                            exit(1);
+                        }
                     }
                 }
                 //clears the command args array
@@ -232,95 +251,96 @@ void separate_input_pipes()
                 arg_index += 1; 
             }
 
-            //if last one is even we use fd1
+            //if last one is even we use fd1 (if given odd number of pipes)
             if((all_args_index % 2) == 0){
                 if(all_args_index > 2){
-                    if(close(pipe_fd2[0]) == -1){
+                    if(close(read_fd2) == -1){
                         perror("close");
                         exit(1);
                     }
-                    if(close(pipe_fd2[1]) == -1){
-                        perror("close");
-                        exit(1);
-                    }
+                    // if(close(write_fd1) == -1){
+                    //     perror("close");
+                    //     exit(1);
+                    // }
                 }
 
-                if(close(pipe_fd1[1]) == -1){
+                if(close(write_fd1) == -1){
                     perror("close1");
                     exit(1);
                 }
                 // parse user input for > or >>
-                if(process_redirection(command_args, -1, -1, pipe_fd1[0], pipe_fd1[1]) != 0){
+                if(process_redirection(command_args, -1, -1, write_fd1, read_fd1) != 0){
                     exit(1);
                 }
 
                 // close ends of pipes
-                if(close(pipe_fd1[0]) == -1){
+                if(close(read_fd1) == -1){
                     perror("close2");
                     exit(1);
                 }
-                // if(close(pipe_fd1[1]) == -1){
+                // if(close(write_fd1) == -1){
                 //     perror("close3");
                 //     exit(1);
                 // }
             }
-            //if last one is odd we use fd2
+            //if last one is odd we use fd2 (if given even number of pipes)
             else{
-                if(close(pipe_fd1[0]) == -1){
+                if(close(read_fd1) == -1){
                     perror("close");
                     exit(1);
                 }
-                if(close(pipe_fd1[1]) == -1){
-                    perror("close");
-                    exit(1);
-                }
+                // WE CLOSED write_fd1 IN LOOP
+                // if(close(write_fd1) == -1){
+                //     perror("close");
+                //     exit(1);
+                // }
 
-                if(close(pipe_fd2[1]) == -1){
+                if(close(write_fd2) == -1){
                     perror("close");
                     exit(1);
                 }
                 // parse user input for > or >>
-                if(process_redirection(command_args, -1, -1, pipe_fd2[0], pipe_fd2[1]) != 0){
+                if(process_redirection(command_args, -1, -1, write_fd2, read_fd2) != 0){
                     exit(1);
                 }
 
                 // close ends of pipe
-                if(close(pipe_fd2[0]) == -1){
+                if(close(read_fd2) == -1){
                     perror("close");
                     exit(1);
                 }
-                if(close(pipe_fd2[1]) == -1){
-                    perror("close");
-                    exit(1);
-                }
+                // if(close(write_fd2) == -1){
+                //     perror("close");
+                //     exit(1);
+                // }
             }
             
             // wait for each child
-            for(j = 0; j < all_args_index; j++){
-                if(wait(&exit_value) == -1){
-                    perror("wait");
-                    exit(1);
-                }
-            }
+            // for(j = 0; j < all_args_index; j++){
+            //     if(wait(&exit_value) == -1){
+            //         perror("wait");
+            //         exit(1);
+            //     }
+            // }
         }
         else{
             printf("we return incorrectly\n");
             // close appropriate fds
             if(all_args_index > 2){
-                if(close(pipe_fd2[0]) == -1){
+                if(close(read_fd2) == -1){
                     perror("close");
                     exit(1);
                 }
-                if(close(pipe_fd2[1]) == -1){
+                if(close(write_fd2) == -1){
                     perror("close");
                     exit(1);
                 }
             }
-            if(close(pipe_fd1[0]) == -1){
+            if(close(read_fd1) == -1){
                 perror("close2");
                 exit(1);
             }
-            if(close(pipe_fd1[1]) == -1){
+            if(close(write_fd1) == -1){
                 perror("close3");
                 exit(1);
             }
@@ -330,10 +350,11 @@ void separate_input_pipes()
     }
 }
 
+//GOING TO NEED TO CHANGE THE PARAMETERS
 /*
 * Parse the sections of the input for redirection (<, >, >>) and run the commands. 
 */
-int process_redirection(char *input_args[], int fd_dup, int fd_close, int fd_dup1, int fd_close1)
+int process_redirection(char *input_args[], int write_fd1, int read_fd1, int write_fd2, int read_fd2)
 {
     int i, j;
     int fd_in, fd_out;
@@ -494,6 +515,12 @@ int process_redirection(char *input_args[], int fd_dup, int fd_close, int fd_dup
                     perror("evecvp");
                     return -1;
                 }
+            } 
+            else{
+                if(wait(&exit_value) == -1){
+                    perror("wait");
+                    exit(1);
+                }
             }
         }
         //if only < provided
@@ -512,13 +539,13 @@ int process_redirection(char *input_args[], int fd_dup, int fd_close, int fd_dup
                     exit(1);
                 }
 
-                if(fd_dup != -1){
-                    if((dup2(fd_dup, 1)) == -1){
+                if(write_fd1 != -1){
+                    if((dup2(write_fd1, 1)) == -1){
                         perror("dup2");
                         exit(1);
                     }
 
-                    if(close(fd_close) == -1){
+                    if(close(read_fd1) == -1){
                         perror("close");
                         exit(1);
                     }
@@ -564,13 +591,13 @@ int process_redirection(char *input_args[], int fd_dup, int fd_close, int fd_dup
                     exit(1);
                 }
 
-                if(fd_dup1 != -1){
-                    if((dup2(fd_dup1, 0)) == -1){
+                if(read_fd2 != -1){
+                    if((dup2(read_fd2, 0)) == -1){
                         perror("dup2");
                         exit(1);
                     }
 
-                    if(close(fd_close1) == -1){
+                    if(close(write_fd2) == -1){
                         perror("close");
                         exit(1);
                     }
@@ -612,13 +639,13 @@ int process_redirection(char *input_args[], int fd_dup, int fd_close, int fd_dup
                     exit(1);
                 }
                
-                if(fd_dup1 != -1){
-                    if((dup2(fd_dup1, 0)) == -1){
+                if(read_fd2 != -1){
+                    if((dup2(read_fd2, 0)) == -1){
                         perror("dup2");
                         exit(1);
                     }
 
-                    if(close(fd_close1) == -1){
+                    if(close(write_fd2) == -1){
                         perror("close");
                         exit(1);
                     }
@@ -648,28 +675,25 @@ int process_redirection(char *input_args[], int fd_dup, int fd_close, int fd_dup
     if(is_redirect == 0){
         //process is the child
         if(fork() == 0){
-            if(fd_dup != -1){
-                if((dup2(fd_dup, 1)) == -1){
+            if(write_fd1 != -1){
+                if((dup2(write_fd1, 1)) == -1){
                     perror("dup2");
                     exit(1);
                 }
 
-                if(close(fd_close) == -1){
-                    perror("close4");
-                    exit(1);
-                }
-            }
-            printf("fd_dup1 = %d\n", fd_dup1);
-
-            if(fd_dup1 != -1){
-                if((dup2(fd_dup1, 0)) == -1){
-                    perror("dup2");
-                    exit(1);
-                }
-                // if(close(fd_close1) == -1){
-                //     perror("close5");
+                // DOES THIS NEED TO RUN UNDER CERTAIN CASES?
+                // if(close(read_fd1) == -1){
+                //     perror("close4");
                 //     exit(1);
                 // }
+            }
+            //printf("read_fd2 = %d\n", read_fd2);
+
+            if(read_fd2 != -1){
+                if((dup2(read_fd2, 0)) == -1){
+                    perror("dup2");
+                    exit(1);
+                }
             }
 
             if(execvp(input_args[0], input_args) == -1){
@@ -680,6 +704,7 @@ int process_redirection(char *input_args[], int fd_dup, int fd_close, int fd_dup
         //process is the parent
         else{
             if(wait(&exit_value) == -1){
+                printf("we are waiting here?\n");
                 perror("wait");
                 exit(1);
             }
