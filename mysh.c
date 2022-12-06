@@ -259,10 +259,10 @@ void separate_input_pipes()
                     perror("close2");
                     exit(1);
                 }
-                if(close(pipe_fd1[1]) == -1){
-                    perror("close3");
-                    exit(1);
-                }
+                // if(close(pipe_fd1[1]) == -1){
+                //     perror("close3");
+                //     exit(1);
+                // }
             }
             //if last one is odd we use fd2
             else{
@@ -304,8 +304,8 @@ void separate_input_pipes()
             }
         }
         else{
-            printf("we return correctly\n");
-            //close appropriate fds
+            printf("we return incorrectly\n");
+            // close appropriate fds
             if(all_args_index > 2){
                 if(close(pipe_fd2[0]) == -1){
                     perror("close");
@@ -666,10 +666,10 @@ int process_redirection(char *input_args[], int fd_dup, int fd_close, int fd_dup
                     perror("dup2");
                     exit(1);
                 }
-                if(close(fd_close1) == -1){
-                    perror("close5");
-                    exit(1);
-                }
+                // if(close(fd_close1) == -1){
+                //     perror("close5");
+                //     exit(1);
+                // }
             }
 
             if(execvp(input_args[0], input_args) == -1){
