@@ -597,10 +597,10 @@ int process_redirection(char *input_args[], int write_fd1, int read_fd1, int wri
                         exit(1);
                     }
 
-                    if(close(write_fd2) == -1){
-                        perror("close");
-                        exit(1);
-                    }
+                    // if(close(write_fd2) == -1){
+                    //     perror("close");
+                    //     exit(1);
+                    // }
                 }
 
                 if(execvp(prev_args[0], prev_args) == -1){
@@ -645,10 +645,10 @@ int process_redirection(char *input_args[], int write_fd1, int read_fd1, int wri
                         exit(1);
                     }
 
-                    if(close(write_fd2) == -1){
-                        perror("close");
-                        exit(1);
-                    }
+                    // if(close(write_fd2) == -1){
+                    //     perror("close");
+                    //     exit(1);
+                    // }
                 }
 
                 if(execvp(prev_args[0], prev_args) == -1){
@@ -697,7 +697,7 @@ int process_redirection(char *input_args[], int write_fd1, int read_fd1, int wri
             }
 
             if(execvp(input_args[0], input_args) == -1){
-                perror("evecvp");
+                perror("evecvp1");
                 return -1;
             }
         }
