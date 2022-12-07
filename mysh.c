@@ -36,7 +36,6 @@ void separate_input_pipes()
     static char *command_args[MAX_NUMBER_ARGS];
     //index of the argument in the array
     int arg_index;
-    int exit_value;
     //index to clear command_args for each index
     int i;
     //var to iterate through sections of commands
@@ -48,11 +47,11 @@ void separate_input_pipes()
     int write_fd1;
     int read_fd2;
     int write_fd2;
-    // int pipe_fd1[2];
-    // int pipe_fd2[2];
     int pipe_fds[2];
-    //REMOVE THIS 
-    int check;
+
+    // initialized here because only set when more than 1 pipe is provided
+    read_fd2 = -1;
+    write_fd2 = -1;
 
     //print prompt and get user input
     printf("$ ");
@@ -82,8 +81,6 @@ void separate_input_pipes()
         sec_of_command = all_args[0];
         arg_index = 0;
 
-
-        // -----CAN WE MAKE THIS A FUNCTION------
         //seperates each argument
         command_args[arg_index] = strtok(sec_of_command, " ");
         arg_index += 1;
@@ -91,7 +88,6 @@ void separate_input_pipes()
         while((command_args[arg_index] = strtok(NULL, " ")) != NULL){
             arg_index += 1;
         }
-        //----------------------------------------
 
         //handle <, >, and >> and exec arguments
         process_redirection(command_args , -1, -1, -1, -1);
@@ -104,7 +100,6 @@ void separate_input_pipes()
         sec_of_command = all_args[0];
         arg_index = 0;
 
-        // -----CAN WE MAKE THIS A FUNCTION------
         //seperates each argument
         command_args[arg_index] = strtok(sec_of_command, " ");
         arg_index += 1;
@@ -112,7 +107,6 @@ void separate_input_pipes()
         while((command_args[arg_index] = strtok(NULL, " ")) != NULL){
             arg_index += 1;
         }
-        //----------------------------------------
 
         //pipe to create write and read end
         if(pipe(pipe_fds) == -1){
@@ -123,8 +117,7 @@ void separate_input_pipes()
         write_fd1 = pipe_fds[1];
 
         //Find input redirection and exec first command, only continue if this exits successfully
-        if((check = process_redirection(command_args, write_fd1, read_fd1, -1, -1)) == 0){
-            printf("return value of process redirection: %d\n", check);
+        if(process_redirection(command_args, write_fd1, read_fd1, -1, -1) == 0){
             //clear argument array
             for(i = 0; i < MAX_NUMBER_ARGS; i++){
                 command_args[i] = NULL;
@@ -136,21 +129,18 @@ void separate_input_pipes()
                 sec_of_command = all_args[j];
                 arg_index = 0;
 
-                // -----CAN WE MAKE THIS A FUNCTION------
                 command_args[arg_index] = strtok(sec_of_command, " ");
                 arg_index += 1;
 
                 while((command_args[arg_index] = strtok(NULL, " ")) != NULL){
                     arg_index += 1; 
                 }
-                // ---------------------------------------
 
                 //if j is even replace contents of fd1
                 if((j % 2) == 0){
                     
                     //close previous fds
                     if(j >= 2){
-                        //-----THE BELOW CAN ALSO PROBABLY BE A FUNCTION w param pipe_fd
                         if(close(read_fd1) == -1){
                             perror("close");
                             exit(1);
@@ -174,7 +164,6 @@ void separate_input_pipes()
                 else{
                     //close previous fds
                     if(j >= 2){
-                        //-----THE BELOW CAN ALSO PROBABLY BE A FUNCTION w param pipe_fd
                         if(close(read_fd2) == -1){
                             perror("close");
                             exit(1);
@@ -266,7 +255,6 @@ void separate_input_pipes()
             
         }
         else{
-            printf("we return incorrectly\n");
             // close appropriate fds
             if(all_args_index > 2){
                 if(close(read_fd2) == -1){
@@ -305,7 +293,6 @@ int process_redirection(char *input_args[], int write_fd1, int read_fd1, int wri
     int exit_value;
     static char *prev_args[MAX_NUMBER_ARGS];
     int input_index, output_index;
-    int exit_pid;
 
     //clear prev_args array
     for(i = 0; i < MAX_NUMBER_ARGS; i++){
@@ -321,7 +308,6 @@ int process_redirection(char *input_args[], int write_fd1, int read_fd1, int wri
         //store index of input redirection carrot
         if(strcmp(input_args[i], "<") == 0){
             indices[0] = i;
-            //----CAN THIS ALSO BE A FUNCTION?---
             //if this is the first redirect, process the commands
             if(is_redirect == 0){
                 // Process all arguments until the redirection
@@ -330,7 +316,6 @@ int process_redirection(char *input_args[], int write_fd1, int read_fd1, int wri
                 }
                 is_redirect = 1;
             }
-            //--------------------------------
             
         }
         
@@ -338,7 +323,6 @@ int process_redirection(char *input_args[], int write_fd1, int read_fd1, int wri
         if((strcmp(input_args[i], ">") == 0)) {
             indices[1] = i;
 
-            //----CAN THIS ALSO BE A FUNCTION?---
             if(is_redirect == 0){
                 // Process all arguments until the redirection
                 for(j = 0; j < i; j++){
@@ -346,14 +330,12 @@ int process_redirection(char *input_args[], int write_fd1, int read_fd1, int wri
                 }
             }
             is_redirect = 1;
-            //--------------------------------
             
         }
         //store index of output redirection carrot
         if(strcmp(input_args[i], ">>") == 0){
             indices[2] = i;
 
-            //----CAN THIS ALSO BE A FUNCTION?---
             if(is_redirect == 0){
                 // Process all arguments until the redirection
                 for(j = 0; j < i; j++){
@@ -361,7 +343,6 @@ int process_redirection(char *input_args[], int write_fd1, int read_fd1, int wri
                 }
             }
             is_redirect = 1;
-            //--------------------------------
         }
         i++;
     }
@@ -659,4 +640,3 @@ int process_redirection(char *input_args[], int write_fd1, int read_fd1, int wri
 
     return 0;
 }
-
