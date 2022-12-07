@@ -51,6 +51,8 @@ void separate_input_pipes()
     // int pipe_fd1[2];
     // int pipe_fd2[2];
     int pipe_fds[2];
+    //REMOVE THIS 
+    int check;
 
     //print prompt and get user input
     printf("$ ");
@@ -92,10 +94,7 @@ void separate_input_pipes()
         //----------------------------------------
 
         //handle <, >, and >> and exec arguments
-        if(process_redirection(command_args , -1, -1, -1, -1) != 0){
-            printf("we get here\n");
-            exit(1);
-        }
+        process_redirection(command_args , -1, -1, -1, -1);
 
     }
     //IF THERE ARE PIPES
@@ -124,8 +123,8 @@ void separate_input_pipes()
         write_fd1 = pipe_fds[1];
 
         //Find input redirection and exec first command, only continue if this exits successfully
-        if(process_redirection(command_args, write_fd1, read_fd1, -1, -1) == 0){
-
+        if((check = process_redirection(command_args, write_fd1, read_fd1, -1, -1)) == 0){
+            printf("return value of process redirection: %d\n", check);
             //clear argument array
             for(i = 0; i < MAX_NUMBER_ARGS; i++){
                 command_args[i] = NULL;
@@ -169,9 +168,7 @@ void separate_input_pipes()
                     read_fd1 = pipe_fds[0];
                     write_fd1 = pipe_fds[1];
                     
-                    if(process_redirection(command_args, write_fd1, read_fd1, write_fd2, read_fd2) == -1){
-                        exit(1);
-                    }
+                    process_redirection(command_args, write_fd1, read_fd1, write_fd2, read_fd2);
                 }
                 //if j is odd replace contents of fd2
                 else{
@@ -201,36 +198,8 @@ void separate_input_pipes()
                     read_fd2 = pipe_fds[0];
                     write_fd2 = pipe_fds[1];
 
-                    if(fork() == 0){
-                        //read from read end
-                        if((dup2(read_fd1, 0)) == -1) {
-                            perror("dup2");
-                            exit(1);
-                        }
+                    process_redirection(command_args, write_fd2, -1, -1, read_fd1);
 
-                        //write to write end of pipe
-                        if((dup2(write_fd2, 1)) == -1){
-                            perror("dup2");
-                            exit(1);
-                        }
-
-                        // if(close(read_fd2) == -1){
-                        //     perror("close");
-                        //     exit(1);
-                        // }
-
-                        if(execvp(command_args[0], command_args) == -1){
-                            perror("evecvp");
-                            exit(1);
-                        }
-                    
-                    }
-                    else{
-                        if(wait(&exit_value) == -1){
-                            perror("wait");
-                            exit(1);
-                        }
-                    }
                 }
                 //clears the command args array
                 for(i = 0; i < MAX_NUMBER_ARGS; i++){
@@ -258,10 +227,6 @@ void separate_input_pipes()
                         perror("close");
                         exit(1);
                     }
-                    // if(close(write_fd1) == -1){
-                    //     perror("close");
-                    //     exit(1);
-                    // }
                 }
 
                 if(close(write_fd1) == -1){
@@ -269,19 +234,14 @@ void separate_input_pipes()
                     exit(1);
                 }
                 // parse user input for > or >>
-                if(process_redirection(command_args, -1, -1, write_fd1, read_fd1) != 0){
-                    exit(1);
-                }
+                process_redirection(command_args, -1, -1, write_fd1, read_fd1);
 
                 // close ends of pipes
                 if(close(read_fd1) == -1){
                     perror("close2");
                     exit(1);
                 }
-                // if(close(write_fd1) == -1){
-                //     perror("close3");
-                //     exit(1);
-                // }
+
             }
             //if last one is odd we use fd2 (if given even number of pipes)
             else{
@@ -289,39 +249,21 @@ void separate_input_pipes()
                     perror("close");
                     exit(1);
                 }
-                // WE CLOSED write_fd1 IN LOOP
-                // if(close(write_fd1) == -1){
-                //     perror("close");
-                //     exit(1);
-                // }
 
                 if(close(write_fd2) == -1){
                     perror("close");
                     exit(1);
                 }
                 // parse user input for > or >>
-                if(process_redirection(command_args, -1, -1, write_fd2, read_fd2) != 0){
-                    exit(1);
-                }
+                process_redirection(command_args, -1, -1, write_fd2, read_fd2);
 
                 // close ends of pipe
                 if(close(read_fd2) == -1){
                     perror("close");
                     exit(1);
                 }
-                // if(close(write_fd2) == -1){
-                //     perror("close");
-                //     exit(1);
-                // }
             }
             
-            // wait for each child
-            // for(j = 0; j < all_args_index; j++){
-            //     if(wait(&exit_value) == -1){
-            //         perror("wait");
-            //         exit(1);
-            //     }
-            // }
         }
         else{
             printf("we return incorrectly\n");
@@ -344,13 +286,11 @@ void separate_input_pipes()
                 perror("close3");
                 exit(1);
             }
-            
-            exit(1);
         }
     }
 }
 
-//GOING TO NEED TO CHANGE THE PARAMETERS
+
 /*
 * Parse the sections of the input for redirection (<, >, >>) and run the commands. 
 */
@@ -365,8 +305,8 @@ int process_redirection(char *input_args[], int write_fd1, int read_fd1, int wri
     int exit_value;
     static char *prev_args[MAX_NUMBER_ARGS];
     int input_index, output_index;
+    int exit_pid;
 
-    printf("calling process_redir \n");
     //clear prev_args array
     for(i = 0; i < MAX_NUMBER_ARGS; i++){
         prev_args[i] = '\0';
@@ -460,7 +400,7 @@ int process_redirection(char *input_args[], int write_fd1, int read_fd1, int wri
 
                 if(execvp(prev_args[0], prev_args) == -1){
                     perror("evecvp");
-                    return -1;
+                    exit(1);
                 }
             }
             //process is the parent
@@ -468,6 +408,9 @@ int process_redirection(char *input_args[], int write_fd1, int read_fd1, int wri
                 if(wait(&exit_value) == -1){
                     perror("wait");
                     exit(1);
+                }
+                if(WEXITSTATUS(exit_value) != 0){
+                    return -1;
                 }
             }
             
@@ -513,13 +456,16 @@ int process_redirection(char *input_args[], int write_fd1, int read_fd1, int wri
 
                 if(execvp(prev_args[0], prev_args) == -1){
                     perror("evecvp");
-                    return -1;
+                    exit(1);
                 }
             } 
             else{
                 if(wait(&exit_value) == -1){
                     perror("wait");
                     exit(1);
+                }
+                if(WEXITSTATUS(exit_value) != 0){
+                    return -1;
                 }
             }
         }
@@ -553,7 +499,7 @@ int process_redirection(char *input_args[], int write_fd1, int read_fd1, int wri
 
                 if(execvp(prev_args[0], prev_args) == -1){
                     perror("evecvp");
-                    return -1;
+                    exit(1);
                 }
             }
             //process is the parent
@@ -561,6 +507,9 @@ int process_redirection(char *input_args[], int write_fd1, int read_fd1, int wri
                 if(wait(&exit_value) == -1){
                     perror("wait");
                     exit(1);
+                }
+                if(WEXITSTATUS(exit_value) != 0){
+                    return -1;
                 }
             }
             
@@ -596,24 +545,24 @@ int process_redirection(char *input_args[], int write_fd1, int read_fd1, int wri
                         perror("dup2");
                         exit(1);
                     }
-
-                    // if(close(write_fd2) == -1){
-                    //     perror("close");
-                    //     exit(1);
-                    // }
                 }
 
                 if(execvp(prev_args[0], prev_args) == -1){
                     perror("evecvp");
-                    return -1;
+                    exit(1);
                 }
             }
             //process is the parent
             else{
+
                 if(wait(&exit_value) == -1){
                     perror("wait");
                     exit(1);
-                }            
+                }       
+                if(WEXITSTATUS(exit_value) != 0){
+                    return -1;
+                }
+
             }
             
             if(close(fd_out) == -1){
@@ -644,16 +593,11 @@ int process_redirection(char *input_args[], int write_fd1, int read_fd1, int wri
                         perror("dup2");
                         exit(1);
                     }
-
-                    // if(close(write_fd2) == -1){
-                    //     perror("close");
-                    //     exit(1);
-                    // }
                 }
 
                 if(execvp(prev_args[0], prev_args) == -1){
                     perror("evecvp");
-                    return -1;
+                    exit(1);
                 }
             }
             //process is the parent
@@ -661,6 +605,9 @@ int process_redirection(char *input_args[], int write_fd1, int read_fd1, int wri
                 if(wait(&exit_value) == -1){
                     perror("wait");
                     exit(1);
+                }
+                if(WEXITSTATUS(exit_value) != 0){
+                    return -1;
                 }
             }
             
@@ -676,18 +623,13 @@ int process_redirection(char *input_args[], int write_fd1, int read_fd1, int wri
         //process is the child
         if(fork() == 0){
             if(write_fd1 != -1){
+
                 if((dup2(write_fd1, 1)) == -1){
                     perror("dup2");
                     exit(1);
                 }
 
-                // DOES THIS NEED TO RUN UNDER CERTAIN CASES?
-                // if(close(read_fd1) == -1){
-                //     perror("close4");
-                //     exit(1);
-                // }
             }
-            //printf("read_fd2 = %d\n", read_fd2);
 
             if(read_fd2 != -1){
                 if((dup2(read_fd2, 0)) == -1){
@@ -697,17 +639,21 @@ int process_redirection(char *input_args[], int write_fd1, int read_fd1, int wri
             }
 
             if(execvp(input_args[0], input_args) == -1){
-                perror("evecvp1");
-                return -1;
+                perror("execvp1");
+                exit(1);
             }
         }
         //process is the parent
         else{
+
             if(wait(&exit_value) == -1){
-                printf("we are waiting here?\n");
                 perror("wait");
                 exit(1);
             }
+            if(WEXITSTATUS(exit_value) != 0){
+                return -1;
+            }
+            
         }
     }
 
