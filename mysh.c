@@ -142,12 +142,12 @@ void separate_input_pipes()
                     //close previous fds
                     if(j >= 2){
                         if(close(read_fd1) == -1){
-                            perror("close");
+                            perror("close1");
                             exit(1);
                         }
 
                         if(close(write_fd2) == -1){
-                            perror("close");
+                            perror("close2");
                             exit(1);
                         }
                     }
@@ -165,18 +165,18 @@ void separate_input_pipes()
                     //close previous fds
                     if(j >= 2){
                         if(close(read_fd2) == -1){
-                            perror("close");
+                            perror("close3");
                             exit(1);
                         }
                         if(close(write_fd2) == -1){
-                            perror("close");
+                            perror("close4");
                             exit(1);
                         }
                     }
                     
                     //close write end, so we don't have to close in child
                     if(close(write_fd1) == -1){
-                        perror("close");
+                        perror("close5");
                         exit(1);
                     }
 
@@ -213,13 +213,13 @@ void separate_input_pipes()
             if((all_args_index % 2) == 0){
                 if(all_args_index > 2){
                     if(close(read_fd2) == -1){
-                        perror("close");
+                        perror("close6");
                         exit(1);
                     }
                 }
 
                 if(close(write_fd1) == -1){
-                    perror("close1");
+                    perror("close7");
                     exit(1);
                 }
                 // parse user input for > or >>
@@ -227,7 +227,7 @@ void separate_input_pipes()
 
                 // close ends of pipes
                 if(close(read_fd1) == -1){
-                    perror("close2");
+                    perror("close8");
                     exit(1);
                 }
 
@@ -235,12 +235,12 @@ void separate_input_pipes()
             //if last one is odd we use fd2 (if given even number of pipes)
             else{
                 if(close(read_fd1) == -1){
-                    perror("close");
+                    perror("close9");
                     exit(1);
                 }
 
                 if(close(write_fd2) == -1){
-                    perror("close");
+                    perror("close10");
                     exit(1);
                 }
                 // parse user input for > or >>
@@ -248,7 +248,7 @@ void separate_input_pipes()
 
                 // close ends of pipe
                 if(close(read_fd2) == -1){
-                    perror("close");
+                    perror("close11");
                     exit(1);
                 }
             }
@@ -258,20 +258,20 @@ void separate_input_pipes()
             // close appropriate fds
             if(all_args_index > 2){
                 if(close(read_fd2) == -1){
-                    perror("close");
+                    perror("close12");
                     exit(1);
                 }
                 if(close(write_fd2) == -1){
-                    perror("close");
+                    perror("close13");
                     exit(1);
                 }
             }
             if(close(read_fd1) == -1){
-                perror("close2");
+                perror("close14");
                 exit(1);
             }
             if(close(write_fd1) == -1){
-                perror("close3");
+                perror("close15");
                 exit(1);
             }
         }
@@ -396,11 +396,11 @@ int process_redirection(char *input_args[], int write_fd1, int read_fd1, int wri
             }
             
             if(close(fd_in) == -1){
-                perror("close");
+                perror("close16");
                 exit(1);
             }
             if(close(fd_out) == -1){
-                perror("close");
+                perror("close17");
                 exit(1);
             }
         }
@@ -473,7 +473,7 @@ int process_redirection(char *input_args[], int write_fd1, int read_fd1, int wri
                     }
 
                     if(close(read_fd1) == -1){
-                        perror("close");
+                        perror("close18");
                         exit(1);
                     }
                 }
@@ -495,7 +495,7 @@ int process_redirection(char *input_args[], int write_fd1, int read_fd1, int wri
             }
             
             if(close(fd_in) == -1){
-                perror("close");
+                perror("close19");
                 exit(1);
             }
         }
@@ -547,7 +547,7 @@ int process_redirection(char *input_args[], int write_fd1, int read_fd1, int wri
             }
             
             if(close(fd_out) == -1){
-                perror("close");
+                perror("close20");
                 exit(1);
             }
         }
@@ -593,7 +593,7 @@ int process_redirection(char *input_args[], int write_fd1, int read_fd1, int wri
             }
             
             if(close(fd_out) == -1){
-                perror("close");
+                perror("close21");
                 exit(1);
             }
         }
