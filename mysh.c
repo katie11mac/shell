@@ -11,7 +11,7 @@
 #define INPUT_MAX_LENGTH 4096
 #define MAX_NUMBER_ARGS 10
 
-void separate_input_pipes();
+void separate_input_pipes(void);
 int process_redirection(char *input_args[], int write_fd1, int read_fd1, int write_fd2, int read_fd2);
 
 int main(int argc, char *argv[])
