@@ -168,13 +168,9 @@ void separate_input_pipes()
                             perror("close3");
                             exit(1);
                         }
-                        if(close(write_fd2) == -1){
-                            perror("close4");
-                            exit(1);
-                        }
                     }
                     
-                    //close write end, so we don't have to close in child
+                    // //close write end, so we don't have to close in child
                     if(close(write_fd1) == -1){
                         perror("close5");
                         exit(1);
