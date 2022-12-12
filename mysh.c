@@ -11,8 +11,8 @@
 #define INPUT_MAX_LENGTH 4096
 #define MAX_NUMBER_ARGS 10
 
-void process_user_input(void);
-void parse_and_process_pipes(char *all_args[], int all_args_index, char *command_args[]);
+int parse_and_process_user_input(void);
+void process_pipes(char *all_args[], int all_args_index, char *command_args[]);
 int process_redirection(char *input_args[], int write_fd1, int read_fd1, int write_fd2, int read_fd2);
 void separate_args(char *sec_of_command, char *command_args[]);
 int parse_redirection(char *symbol, char *input_args[], int i, int is_redirect, char *prev_args[], int indices[], int index_of_indices);
@@ -20,7 +20,7 @@ int parse_redirection(char *symbol, char *input_args[], int i, int is_redirect, 
 int main(int argc, char *argv[])
 {
     for(;;){
-        process_user_input();
+        parse_and_process_user_input();
     }
 
     return 0;
@@ -29,7 +29,7 @@ int main(int argc, char *argv[])
 /*
 * Get the user input and process it
 */
-void process_user_input()
+int parse_and_process_user_input()
 {
     char original_user_input[INPUT_MAX_LENGTH];
     char *edited_user_input;
@@ -50,6 +50,10 @@ void process_user_input()
 
     //get rid of \n character
     edited_user_input = strtok(original_user_input, "\n");
+
+    if(edited_user_input == NULL){
+        return -1;
+    }
 
     //check if command is exit
     if((strcmp(edited_user_input, "exit") == 0)){
@@ -75,15 +79,16 @@ void process_user_input()
     }
     //IF THERE ARE PIPES
     else{
-        parse_and_process_pipes(all_args, all_args_index, command_args);
+        process_pipes(all_args, all_args_index, command_args);
     }
-}
 
+    return 0;
+}
 
 /*
 * 
 */
-void parse_and_process_pipes(char *all_args[], int all_args_index, char *command_args[])
+void process_pipes(char *all_args[], int all_args_index, char *command_args[])
 {
     //index to clear command_args for each index
     int i;
