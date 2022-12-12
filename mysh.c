@@ -14,6 +14,7 @@
 void separate_input_pipes(void);
 int process_redirection(char *input_args[], int write_fd1, int read_fd1, int write_fd2, int read_fd2);
 void separate_args(char *sec_of_command, char *command_args[]);
+int parse_redirection(char *symbol, char *input_args[], int i, int is_redirect, char *prev_args[], int indices[], int index_of_indices);
 
 int main(int argc, char *argv[])
 {
@@ -252,7 +253,7 @@ void separate_input_pipes()
 */
 int process_redirection(char *input_args[], int write_fd1, int read_fd1, int write_fd2, int read_fd2)
 {
-    int i, j;
+    int i;
     int fd_in, fd_out;
     // array for storing index of redirection symbols
     //      indices[0]: index of <, indices[1]: index of >, indices[2]: index of >>
@@ -274,44 +275,20 @@ int process_redirection(char *input_args[], int write_fd1, int read_fd1, int wri
     while(input_args[i] != NULL){
 
         //store index of input redirection carrot
-        if(strcmp(input_args[i], "<") == 0){
-            indices[0] = i;
-            //if this is the first redirect, process the commands
-            if(is_redirect == 0){
-                // Process all arguments until the redirection
-                for(j = 0; j < i; j++){
-                    prev_args[j] = input_args[j];
-                }
-                is_redirect = 1;
-            }
-            
+        if(parse_redirection("<", input_args, i, is_redirect, prev_args, indices, 0) == 1){
+            is_redirect = 1;
         }
         
         //store index of output redirection carrot
-        if((strcmp(input_args[i], ">") == 0)) {
-            indices[1] = i;
-
-            if(is_redirect == 0){
-                // Process all arguments until the redirection
-                for(j = 0; j < i; j++){
-                    prev_args[j] = input_args[j];
-                }
-            }
+        if(parse_redirection(">", input_args, i, is_redirect, prev_args, indices, 1) == 1){
             is_redirect = 1;
-            
         }
+
         //store index of output redirection carrot
-        if(strcmp(input_args[i], ">>") == 0){
-            indices[2] = i;
-
-            if(is_redirect == 0){
-                // Process all arguments until the redirection
-                for(j = 0; j < i; j++){
-                    prev_args[j] = input_args[j];
-                }
-            }
+        if(parse_redirection(">>", input_args, i, is_redirect, prev_args, indices, 2) == 1){
             is_redirect = 1;
         }
+
         i++;
     }
 
@@ -609,6 +586,9 @@ int process_redirection(char *input_args[], int write_fd1, int read_fd1, int wri
     return 0;
 }
 
+/*
+*
+*/
 void separate_args(char *sec_of_command, char *command_args[])
 {
     int arg_index;
@@ -622,4 +602,27 @@ void separate_args(char *sec_of_command, char *command_args[])
     while((command_args[arg_index] = strtok(NULL, " ")) != NULL){
         arg_index += 1;
     }
+}
+
+/*
+* Check if current index i in input_args is the specified redirection symbol. 
+* If it is, update the indices array to indicate where that symbol is in input_args. 
+*/
+int parse_redirection(char *symbol, char *input_args[], int i, int is_redirect, char *prev_args[], int indices[], int index_of_indices)
+{
+    int j; 
+
+    //store index of input redirection carrot
+    if(strcmp(input_args[i], symbol) == 0){
+        indices[index_of_indices] = i;
+        //if this is the first redirect, process the commands
+        if(is_redirect == 0){
+            // Process all arguments until the redirection
+            for(j = 0; j < i; j++){
+                prev_args[j] = input_args[j];
+            }
+            is_redirect = 1;
+        }
+    }
+    return is_redirect;
 }
