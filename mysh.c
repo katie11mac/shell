@@ -13,6 +13,7 @@
 
 void separate_input_pipes(void);
 int process_redirection(char *input_args[], int write_fd1, int read_fd1, int write_fd2, int read_fd2);
+void separate_args(char *sec_of_command, char *command_args[]);
 
 int main(int argc, char *argv[])
 {
@@ -34,8 +35,6 @@ void separate_input_pipes()
     static char *all_args[MAX_NUMBER_ARGS];
     int all_args_index;
     static char *command_args[MAX_NUMBER_ARGS];
-    //index of the argument in the array
-    int arg_index;
     //index to clear command_args for each index
     int i;
     //var to iterate through sections of commands
@@ -79,15 +78,8 @@ void separate_input_pipes()
     //IF THERE ARE NO PIPES
     if(all_args_index == 1){
         sec_of_command = all_args[0];
-        arg_index = 0;
 
-        //seperates each argument
-        command_args[arg_index] = strtok(sec_of_command, " ");
-        arg_index += 1;
-
-        while((command_args[arg_index] = strtok(NULL, " ")) != NULL){
-            arg_index += 1;
-        }
+        separate_args(sec_of_command, command_args);
 
         //handle <, >, and >> and exec arguments
         process_redirection(command_args , -1, -1, -1, -1);
@@ -98,15 +90,8 @@ void separate_input_pipes()
         //HANDLE FIRST LEFT SIDE OF PIPE
         //CREATE STRING ARRAY FOR LEFTMOST SIDE OF PIPE
         sec_of_command = all_args[0];
-        arg_index = 0;
 
-        //seperates each argument
-        command_args[arg_index] = strtok(sec_of_command, " ");
-        arg_index += 1;
-
-        while((command_args[arg_index] = strtok(NULL, " ")) != NULL){
-            arg_index += 1;
-        }
+        separate_args(sec_of_command, command_args);
 
         //pipe to create write and read end
         if(pipe(pipe_fds) == -1){
@@ -127,14 +112,8 @@ void separate_input_pipes()
             for(j = 1; j < all_args_index - 1; j++){
                 //get arg array
                 sec_of_command = all_args[j];
-                arg_index = 0;
-
-                command_args[arg_index] = strtok(sec_of_command, " ");
-                arg_index += 1;
-
-                while((command_args[arg_index] = strtok(NULL, " ")) != NULL){
-                    arg_index += 1; 
-                }
+                
+                separate_args(sec_of_command, command_args);
 
                 //if j is even replace contents of fd1
                 if((j % 2) == 0){
@@ -196,14 +175,8 @@ void separate_input_pipes()
             //HANDLE LAST RIGHT SIDE OF PIPE
             //get arg array
             sec_of_command = all_args[all_args_index-1];
-            arg_index = 0;
-
-            command_args[arg_index] = strtok(sec_of_command, " ");
-            arg_index += 1;
-
-            while((command_args[arg_index] = strtok(NULL, " ")) != NULL){
-                arg_index += 1; 
-            }
+            
+            separate_args(sec_of_command, command_args);
 
             //if last one is even we use fd1 (if given odd number of pipes)
             if((all_args_index % 2) == 0){
@@ -273,7 +246,6 @@ void separate_input_pipes()
         }
     }
 }
-
 
 /*
 * Parse the sections of the input for redirection (<, >, >>) and run the commands. 
@@ -635,4 +607,19 @@ int process_redirection(char *input_args[], int write_fd1, int read_fd1, int wri
     }
 
     return 0;
+}
+
+void separate_args(char *sec_of_command, char *command_args[])
+{
+    int arg_index;
+
+    arg_index = 0;
+
+    //seperates each argument
+    command_args[arg_index] = strtok(sec_of_command, " ");
+    arg_index += 1;
+
+    while((command_args[arg_index] = strtok(NULL, " ")) != NULL){
+        arg_index += 1;
+    }
 }
