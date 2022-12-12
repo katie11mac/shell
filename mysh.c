@@ -11,7 +11,8 @@
 #define INPUT_MAX_LENGTH 4096
 #define MAX_NUMBER_ARGS 10
 
-void separate_input_pipes(void);
+void process_user_input(void);
+void parse_and_process_pipes(char *all_args[], int all_args_index, char *command_args[]);
 int process_redirection(char *input_args[], int write_fd1, int read_fd1, int write_fd2, int read_fd2);
 void separate_args(char *sec_of_command, char *command_args[]);
 int parse_redirection(char *symbol, char *input_args[], int i, int is_redirect, char *prev_args[], int indices[], int index_of_indices);
@@ -19,16 +20,16 @@ int parse_redirection(char *symbol, char *input_args[], int i, int is_redirect, 
 int main(int argc, char *argv[])
 {
     for(;;){
-        separate_input_pipes();
+        process_user_input();
     }
 
     return 0;
 }
 
 /*
-* Get the user input and separate it by pipes
+* Get the user input and process it
 */
-void separate_input_pipes()
+void process_user_input()
 {
     char original_user_input[INPUT_MAX_LENGTH];
     char *edited_user_input;
@@ -36,22 +37,8 @@ void separate_input_pipes()
     static char *all_args[MAX_NUMBER_ARGS];
     int all_args_index;
     static char *command_args[MAX_NUMBER_ARGS];
-    //index to clear command_args for each index
-    int i;
-    //var to iterate through sections of commands
-    int j;
     //section being one part the command on either side of the pipe (only one section w/o pipes)
     char *sec_of_command;
-    //write and read ends of pipe
-    int read_fd1;
-    int write_fd1;
-    int read_fd2;
-    int write_fd2;
-    int pipe_fds[2];
-
-    // initialized here because only set when more than 1 pipe is provided
-    read_fd2 = -1;
-    write_fd2 = -1;
 
     //print prompt and get user input
     printf("$ ");
@@ -88,164 +75,191 @@ void separate_input_pipes()
     }
     //IF THERE ARE PIPES
     else{
-        //HANDLE FIRST LEFT SIDE OF PIPE
-        //CREATE STRING ARRAY FOR LEFTMOST SIDE OF PIPE
-        sec_of_command = all_args[0];
+        parse_and_process_pipes(all_args, all_args_index, command_args);
+    }
+}
 
-        separate_args(sec_of_command, command_args);
 
-        //pipe to create write and read end
-        if(pipe(pipe_fds) == -1){
-            perror("pipe");
-            exit(1);
+/*
+* 
+*/
+void parse_and_process_pipes(char *all_args[], int all_args_index, char *command_args[])
+{
+    //index to clear command_args for each index
+    int i;
+    //var to iterate through sections of commands
+    int j;
+    //section being one part the command on either side of the pipe (only one section w/o pipes)
+    char *sec_of_command;
+    //write and read ends of pipe
+    int read_fd1;
+    int write_fd1;
+    int read_fd2;
+    int write_fd2;
+    int pipe_fds[2];
+
+    // initialized here because only set when more than 1 pipe is provided
+    read_fd2 = -1;
+    write_fd2 = -1;
+
+    //HANDLE FIRST LEFT SIDE OF PIPE
+    //CREATE STRING ARRAY FOR LEFTMOST SIDE OF PIPE
+    sec_of_command = all_args[0];
+
+    separate_args(sec_of_command, command_args);
+
+    //pipe to create write and read end
+    if(pipe(pipe_fds) == -1){
+        perror("pipe");
+        exit(1);
+    }
+    read_fd1 = pipe_fds[0];
+    write_fd1 = pipe_fds[1];
+
+    //Find input redirection and exec first command, only continue if this exits successfully
+    if(process_redirection(command_args, write_fd1, read_fd1, -1, -1) == 0){
+        //clear argument array
+        for(i = 0; i < MAX_NUMBER_ARGS; i++){
+            command_args[i] = NULL;
         }
-        read_fd1 = pipe_fds[0];
-        write_fd1 = pipe_fds[1];
 
-        //Find input redirection and exec first command, only continue if this exits successfully
-        if(process_redirection(command_args, write_fd1, read_fd1, -1, -1) == 0){
-            //clear argument array
+        //FOR LOOP TO HANDLE MIDDLE PIPES
+        for(j = 1; j < all_args_index - 1; j++){
+            //get arg array
+            sec_of_command = all_args[j];
+            
+            separate_args(sec_of_command, command_args);
+
+            //if j is even replace contents of fd1
+            if((j % 2) == 0){
+                
+                //close previous fds
+                if(j >= 2){
+                    if(close(read_fd1) == -1){
+                        perror("close1");
+                        exit(1);
+                    }
+
+                    if(close(write_fd2) == -1){
+                        perror("close2");
+                        exit(1);
+                    }
+                }
+                if(pipe(pipe_fds) == -1){
+                    perror("pipe");
+                    exit(1);
+                }
+                read_fd1 = pipe_fds[0];
+                write_fd1 = pipe_fds[1];
+                
+                process_redirection(command_args, write_fd1, read_fd1, write_fd2, read_fd2);
+            }
+            //if j is odd replace contents of fd2
+            else{
+                //close previous fds
+                if(j >= 2){
+                    if(close(read_fd2) == -1){
+                        perror("close3");
+                        exit(1);
+                    }
+                }
+                
+                // //close write end, so we don't have to close in child
+                if(close(write_fd1) == -1){
+                    perror("close5");
+                    exit(1);
+                }
+
+                if(pipe(pipe_fds) == -1){
+                    perror("pipe");
+                    exit(1);
+                }
+                read_fd2 = pipe_fds[0];
+                write_fd2 = pipe_fds[1];
+
+                process_redirection(command_args, write_fd2, -1, -1, read_fd1);
+
+            }
+            //clears the command args array
             for(i = 0; i < MAX_NUMBER_ARGS; i++){
                 command_args[i] = NULL;
             }
 
-            //FOR LOOP TO HANDLE MIDDLE PIPES
-            for(j = 1; j < all_args_index - 1; j++){
-                //get arg array
-                sec_of_command = all_args[j];
-                
-                separate_args(sec_of_command, command_args);
-
-                //if j is even replace contents of fd1
-                if((j % 2) == 0){
-                    
-                    //close previous fds
-                    if(j >= 2){
-                        if(close(read_fd1) == -1){
-                            perror("close1");
-                            exit(1);
-                        }
-
-                        if(close(write_fd2) == -1){
-                            perror("close2");
-                            exit(1);
-                        }
-                    }
-                    if(pipe(pipe_fds) == -1){
-                        perror("pipe");
-                        exit(1);
-                    }
-                    read_fd1 = pipe_fds[0];
-                    write_fd1 = pipe_fds[1];
-                    
-                    process_redirection(command_args, write_fd1, read_fd1, write_fd2, read_fd2);
-                }
-                //if j is odd replace contents of fd2
-                else{
-                    //close previous fds
-                    if(j >= 2){
-                        if(close(read_fd2) == -1){
-                            perror("close3");
-                            exit(1);
-                        }
-                    }
-                    
-                    // //close write end, so we don't have to close in child
-                    if(close(write_fd1) == -1){
-                        perror("close5");
-                        exit(1);
-                    }
-
-                    if(pipe(pipe_fds) == -1){
-                        perror("pipe");
-                        exit(1);
-                    }
-                    read_fd2 = pipe_fds[0];
-                    write_fd2 = pipe_fds[1];
-
-                    process_redirection(command_args, write_fd2, -1, -1, read_fd1);
-
-                }
-                //clears the command args array
-                for(i = 0; i < MAX_NUMBER_ARGS; i++){
-                    command_args[i] = NULL;
-                }
-
-            }
-
-            //HANDLE LAST RIGHT SIDE OF PIPE
-            //get arg array
-            sec_of_command = all_args[all_args_index-1];
-            
-            separate_args(sec_of_command, command_args);
-
-            //if last one is even we use fd1 (if given odd number of pipes)
-            if((all_args_index % 2) == 0){
-                if(all_args_index > 2){
-                    if(close(read_fd2) == -1){
-                        perror("close6");
-                        exit(1);
-                    }
-                }
-
-                if(close(write_fd1) == -1){
-                    perror("close7");
-                    exit(1);
-                }
-                // parse user input for > or >>
-                process_redirection(command_args, -1, -1, write_fd1, read_fd1);
-
-                // close ends of pipes
-                if(close(read_fd1) == -1){
-                    perror("close8");
-                    exit(1);
-                }
-
-            }
-            //if last one is odd we use fd2 (if given even number of pipes)
-            else{
-                if(close(read_fd1) == -1){
-                    perror("close9");
-                    exit(1);
-                }
-
-                if(close(write_fd2) == -1){
-                    perror("close10");
-                    exit(1);
-                }
-                // parse user input for > or >>
-                process_redirection(command_args, -1, -1, write_fd2, read_fd2);
-
-                // close ends of pipe
-                if(close(read_fd2) == -1){
-                    perror("close11");
-                    exit(1);
-                }
-            }
-            
         }
-        else{
-            // close appropriate fds
+
+        //HANDLE LAST RIGHT SIDE OF PIPE
+        //get arg array
+        sec_of_command = all_args[all_args_index-1];
+        
+        separate_args(sec_of_command, command_args);
+
+        //if last one is even we use fd1 (if given odd number of pipes)
+        if((all_args_index % 2) == 0){
             if(all_args_index > 2){
                 if(close(read_fd2) == -1){
-                    perror("close12");
-                    exit(1);
-                }
-                if(close(write_fd2) == -1){
-                    perror("close13");
+                    perror("close6");
                     exit(1);
                 }
             }
-            if(close(read_fd1) == -1){
-                perror("close14");
+
+            if(close(write_fd1) == -1){
+                perror("close7");
                 exit(1);
             }
-            if(close(write_fd1) == -1){
-                perror("close15");
+            // parse user input for > or >>
+            process_redirection(command_args, -1, -1, write_fd1, read_fd1);
+
+            // close ends of pipes
+            if(close(read_fd1) == -1){
+                perror("close8");
+                exit(1);
+            }
+
+        }
+        //if last one is odd we use fd2 (if given even number of pipes)
+        else{
+            if(close(read_fd1) == -1){
+                perror("close9");
+                exit(1);
+            }
+
+            if(close(write_fd2) == -1){
+                perror("close10");
+                exit(1);
+            }
+            // parse user input for > or >>
+            process_redirection(command_args, -1, -1, write_fd2, read_fd2);
+
+            // close ends of pipe
+            if(close(read_fd2) == -1){
+                perror("close11");
                 exit(1);
             }
         }
+        
     }
+    else{
+        // close appropriate fds
+        if(all_args_index > 2){
+            if(close(read_fd2) == -1){
+                perror("close12");
+                exit(1);
+            }
+            if(close(write_fd2) == -1){
+                perror("close13");
+                exit(1);
+            }
+        }
+        if(close(read_fd1) == -1){
+            perror("close14");
+            exit(1);
+        }
+        if(close(write_fd1) == -1){
+            perror("close15");
+            exit(1);
+        }
+    }
+    
 }
 
 /*
