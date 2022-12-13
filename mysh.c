@@ -16,6 +16,8 @@ void process_pipes(char *all_args[], int all_args_index, char *command_args[]);
 int process_redirection(char *input_args[], int write_fd1, int read_fd1, int write_fd2, int read_fd2);
 void separate_args(char *sec_of_command, char *command_args[]);
 int parse_redirection(char *symbol, char *input_args[], int i, int is_redirect, char *prev_args[], int indices[], int index_of_indices);
+int process_input_output_redir(int indices[], int index, int input_index, char *prev_args[], char *input_args[]);
+int process_output_redir(int indices[], int index, char *prev_args[], char *input_args[], int read_fd2);
 
 int main(int argc, char *argv[])
 {
@@ -273,14 +275,14 @@ void process_pipes(char *all_args[], int all_args_index, char *command_args[])
 int process_redirection(char *input_args[], int write_fd1, int read_fd1, int write_fd2, int read_fd2)
 {
     int i;
-    int fd_in, fd_out;
+    int fd_in;
     // array for storing index of redirection symbols
     //      indices[0]: index of <, indices[1]: index of >, indices[2]: index of >>
     int indices[3] = {-1,-1,-1};
     int is_redirect;
     int exit_value;
     static char *prev_args[MAX_NUMBER_ARGS];
-    int input_index, output_index;
+    int input_index;
 
     //clear prev_args array
     for(i = 0; i < MAX_NUMBER_ARGS; i++){
@@ -316,102 +318,16 @@ int process_redirection(char *input_args[], int write_fd1, int read_fd1, int wri
         input_index = indices[0];
         //if < and > provided 
         if(indices[1] != -1){ 
-            output_index = indices[1];
-            fd_out = open(input_args[output_index+1], O_CREAT | O_WRONLY | O_TRUNC, 0666);
-            
-            if(fd_out == -1){
-                perror("open");
-                exit(1);
-            }
-            
-            fd_in = open(input_args[input_index+1], O_RDONLY);
-            
-            if(fd_in == -1){
-                perror("open");
+
+            if(process_input_output_redir(indices, 1, input_index, prev_args, input_args) == -1){
                 return -1;
-            }
-
-            //process is the child
-            if(fork() == 0){
-                if(dup2(fd_in, 0) == -1){
-                    perror("dup2");
-                    exit(1);
-                }
-
-                if(dup2(fd_out, 1) == -1){
-                    perror("dup2");
-                    exit(1);
-                }
-
-                if(execvp(prev_args[0], prev_args) == -1){
-                    perror("evecvp");
-                    exit(1);
-                }
-            }
-            //process is the parent
-            else{
-                if(wait(&exit_value) == -1){
-                    perror("wait");
-                    exit(1);
-                }
-                if(WEXITSTATUS(exit_value) != 0){
-                    return -1;
-                }
-            }
-            
-            if(close(fd_in) == -1){
-                perror("close16");
-                exit(1);
-            }
-            if(close(fd_out) == -1){
-                perror("close17");
-                exit(1);
             }
         }
         //if < and >> provided
         else if(indices[2] != -1){
-            output_index = indices[2];
 
-            fd_out = open(input_args[output_index+1], O_CREAT | O_WRONLY | O_APPEND, 0666);
-            
-            if(fd_out == -1){
-                perror("open");
-                exit(1);
-            }
-
-            fd_in = open(input_args[input_index+1], O_RDONLY);
-            
-            if(fd_in == -1){
-                perror("open");
-                exit(1);
-            }
-
-            //process is the child
-            if(fork() == 0){
-
-                if(dup2(fd_in, 0) == -1){
-                    perror("dup2");
-                    exit(1);
-                }
-
-                if(dup2(fd_out, 1) == -1){
-                    perror("dup2");
-                    exit(1);
-                }
-
-                if(execvp(prev_args[0], prev_args) == -1){
-                    perror("evecvp");
-                    exit(1);
-                }
-            } 
-            else{
-                if(wait(&exit_value) == -1){
-                    perror("wait");
-                    exit(1);
-                }
-                if(WEXITSTATUS(exit_value) != 0){
-                    return -1;
-                }
+            if(process_input_output_redir(indices, 2, input_index, prev_args, input_args) == -1){
+                return -1;
             }
         }
         //if only < provided
@@ -468,97 +384,16 @@ int process_redirection(char *input_args[], int write_fd1, int read_fd1, int wri
     else{
         //if >
         if(indices[1] != -1){
-            output_index = indices[1];
-
-            fd_out = open(input_args[output_index+1], O_CREAT | O_WRONLY | O_TRUNC, 0666);
             
-            if(fd_out == -1){
-                perror("open");
+            if(process_output_redir(indices, 1, prev_args, input_args, read_fd2) == -1){
                 return -1;
-            }
-
-            //process is the child
-            if(fork() == 0){
-
-                if(dup2(fd_out, 1) == -1){
-                    perror("dup2");
-                    exit(1);
-                }
-
-                if(read_fd2 != -1){
-                    if((dup2(read_fd2, 0)) == -1){
-                        perror("dup2");
-                        exit(1);
-                    }
-                }
-
-                if(execvp(prev_args[0], prev_args) == -1){
-                    perror("evecvp");
-                    exit(1);
-                }
-            }
-            //process is the parent
-            else{
-
-                if(wait(&exit_value) == -1){
-                    perror("wait");
-                    exit(1);
-                }       
-                if(WEXITSTATUS(exit_value) != 0){
-                    return -1;
-                }
-
-            }
-            
-            if(close(fd_out) == -1){
-                perror("close20");
-                exit(1);
             }
         }
         //if >>
         else if(indices[2] != -1){
-            output_index = indices[2];
 
-            fd_out = open(input_args[output_index+1], O_CREAT | O_WRONLY | O_APPEND, 0666);
-            
-            if(fd_out == -1){
-                perror("open");
+            if(process_output_redir(indices, 2, prev_args, input_args, read_fd2) == -1){
                 return -1;
-            }
-
-            //process is the child
-            if(fork() == 0){
-                if(dup2(fd_out, 1) == -1){
-                    perror("dup2");
-                    exit(1);
-                }
-               
-                if(read_fd2 != -1){
-                    if((dup2(read_fd2, 0)) == -1){
-                        perror("dup2");
-                        exit(1);
-                    }
-                }
-
-                if(execvp(prev_args[0], prev_args) == -1){
-                    perror("evecvp");
-                    exit(1);
-                }
-            }
-            //process is the parent
-            else{
-                if(wait(&exit_value) == -1){
-                    perror("wait");
-                    exit(1);
-                }
-                if(WEXITSTATUS(exit_value) != 0){
-                    return -1;
-                }
-            }
-            
-            if(close(fd_out) == -1){
-                perror("close21");
-                exit(1);
             }
         }
     }
@@ -644,4 +479,135 @@ int parse_redirection(char *symbol, char *input_args[], int i, int is_redirect, 
         }
     }
     return is_redirect;
+}
+
+/*
+*
+*/
+int process_input_output_redir(int indices[], int index, int input_index, char *prev_args[], char *input_args[])
+{
+    int fd_out;
+    int fd_in;
+    int output_index;
+    int exit_value;
+    
+    output_index = indices[index];
+
+    if(index == 2){
+        fd_out = open(input_args[output_index+1], O_CREAT | O_WRONLY | O_APPEND, 0666);
+    }
+    else{
+        fd_out = open(input_args[output_index+1], O_CREAT | O_WRONLY | O_TRUNC, 0666);
+    }
+    
+    
+    if(fd_out == -1){
+        perror("open");
+        exit(1);
+    }
+
+    fd_in = open(input_args[input_index+1], O_RDONLY);
+    
+    if(fd_in == -1){
+        perror("open");
+        exit(1);
+    }
+
+    //process is the child
+    if(fork() == 0){
+
+        if(dup2(fd_in, 0) == -1){
+            perror("dup2");
+            exit(1);
+        }
+
+        if(dup2(fd_out, 1) == -1){
+            perror("dup2");
+            exit(1);
+        }
+
+        if(execvp(prev_args[0], prev_args) == -1){
+            perror("evecvp");
+            exit(1);
+        }
+    } 
+    else{
+        if(wait(&exit_value) == -1){
+            perror("wait");
+            exit(1);
+        }
+        if(WEXITSTATUS(exit_value) != 0){
+            return -1;
+        }
+    }
+    if(close(fd_in) == -1){
+        perror("close16");
+        exit(1);
+    }
+    if(close(fd_out) == -1){
+        perror("close17");
+        exit(1);
+    }
+    return 0;
+}
+
+/*
+*
+*/
+int process_output_redir(int indices[], int index, char *prev_args[], char *input_args[], int read_fd2)
+{
+    int fd_out;
+    int output_index;
+    int exit_value;
+
+    output_index = indices[index];
+
+    if(index == 2){
+        fd_out = open(input_args[output_index+1], O_CREAT | O_WRONLY | O_APPEND, 0666);
+    }
+    else{
+        fd_out = open(input_args[output_index+1], O_CREAT | O_WRONLY | O_TRUNC, 0666);
+    }
+    
+    if(fd_out == -1){
+        perror("open");
+        return -1;
+    }
+
+    //process is the child
+    if(fork() == 0){
+        if(dup2(fd_out, 1) == -1){
+            perror("dup2");
+            exit(1);
+        }
+        
+        if(read_fd2 != -1){
+            if((dup2(read_fd2, 0)) == -1){
+                perror("dup2");
+                exit(1);
+            }
+        }
+
+        if(execvp(prev_args[0], prev_args) == -1){
+            perror("evecvp");
+            exit(1);
+        }
+    }
+    //process is the parent
+    else{
+        if(wait(&exit_value) == -1){
+            perror("wait");
+            exit(1);
+        }
+        if(WEXITSTATUS(exit_value) != 0){
+            return -1;
+        }
+    }
+    
+    if(close(fd_out) == -1){
+        perror("close21");
+        exit(1);
+    }
+
+    return 0;
 }
