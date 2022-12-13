@@ -10,3 +10,5 @@ https://www.geeksforgeeks.org/wc-command-linux-examples/
 https://www.cyberciti.biz/faq/run-execute-sh-shell-script/
 
 Notes:
+Still use even and odd functionality when processing pipes but understand that other methods would be cleaner 
+and more stable. 
