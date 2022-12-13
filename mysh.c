@@ -16,8 +16,10 @@ void process_pipes(char *all_args[], int all_args_index, char *command_args[]);
 int process_redirection(char *input_args[], int write_fd1, int read_fd1, int write_fd2, int read_fd2);
 void separate_args(char *sec_of_command, char *command_args[]);
 int parse_redirection(char *symbol, char *input_args[], int i, int is_redirect, char *prev_args[], int indices[], int index_of_indices);
-int process_input_output_redir(int indices[], int index, int input_index, char *prev_args[], char *input_args[]);
-int process_output_redir(int indices[], int index, char *prev_args[], char *input_args[], int read_fd2);
+int run_input_output_redir(int indices[], int index, int input_index, char *prev_args[], char *input_args[]);
+int run_output_redir(int indices[], int index, char *prev_args[], char *input_args[], int read_fd2);
+void handle_middle_pipes(int j, char *command_args[], int *write_fd1, int *read_fd1, int *write_fd2, int *read_fd2);
+
 
 int main(int argc, char *argv[])
 {
@@ -88,7 +90,7 @@ int parse_and_process_user_input()
 }
 
 /*
-* 
+* Process each section on either side of the pipes
 */
 void process_pipes(char *all_args[], int all_args_index, char *command_args[])
 {
@@ -137,61 +139,12 @@ void process_pipes(char *all_args[], int all_args_index, char *command_args[])
             
             separate_args(sec_of_command, command_args);
 
-            //if j is even replace contents of fd1
-            if((j % 2) == 0){
-                
-                //close previous fds
-                if(j >= 2){
-                    if(close(read_fd1) == -1){
-                        perror("close1");
-                        exit(1);
-                    }
+            handle_middle_pipes(j, command_args, &write_fd1, &read_fd1, &write_fd2, &read_fd2);
 
-                    if(close(write_fd2) == -1){
-                        perror("close2");
-                        exit(1);
-                    }
-                }
-                if(pipe(pipe_fds) == -1){
-                    perror("pipe");
-                    exit(1);
-                }
-                read_fd1 = pipe_fds[0];
-                write_fd1 = pipe_fds[1];
-                
-                process_redirection(command_args, write_fd1, read_fd1, write_fd2, read_fd2);
-            }
-            //if j is odd replace contents of fd2
-            else{
-                //close previous fds
-                if(j >= 2){
-                    if(close(read_fd2) == -1){
-                        perror("close3");
-                        exit(1);
-                    }
-                }
-                
-                // //close write end, so we don't have to close in child
-                if(close(write_fd1) == -1){
-                    perror("close5");
-                    exit(1);
-                }
-
-                if(pipe(pipe_fds) == -1){
-                    perror("pipe");
-                    exit(1);
-                }
-                read_fd2 = pipe_fds[0];
-                write_fd2 = pipe_fds[1];
-
-                process_redirection(command_args, write_fd2, -1, -1, read_fd1);
-
-            }
             //clears the command args array
             for(i = 0; i < MAX_NUMBER_ARGS; i++){
                 command_args[i] = NULL;
             }
-
         }
 
         //HANDLE LAST RIGHT SIDE OF PIPE
@@ -319,14 +272,14 @@ int process_redirection(char *input_args[], int write_fd1, int read_fd1, int wri
         //if < and > provided 
         if(indices[1] != -1){ 
 
-            if(process_input_output_redir(indices, 1, input_index, prev_args, input_args) == -1){
+            if(run_input_output_redir(indices, 1, input_index, prev_args, input_args) == -1){
                 return -1;
             }
         }
         //if < and >> provided
         else if(indices[2] != -1){
 
-            if(process_input_output_redir(indices, 2, input_index, prev_args, input_args) == -1){
+            if(run_input_output_redir(indices, 2, input_index, prev_args, input_args) == -1){
                 return -1;
             }
         }
@@ -385,14 +338,14 @@ int process_redirection(char *input_args[], int write_fd1, int read_fd1, int wri
         //if >
         if(indices[1] != -1){
             
-            if(process_output_redir(indices, 1, prev_args, input_args, read_fd2) == -1){
+            if(run_output_redir(indices, 1, prev_args, input_args, read_fd2) == -1){
                 return -1;
             }
         }
         //if >>
         else if(indices[2] != -1){
 
-            if(process_output_redir(indices, 2, prev_args, input_args, read_fd2) == -1){
+            if(run_output_redir(indices, 2, prev_args, input_args, read_fd2) == -1){
                 return -1;
             }
         }
@@ -408,7 +361,6 @@ int process_redirection(char *input_args[], int write_fd1, int read_fd1, int wri
                     perror("dup2");
                     exit(1);
                 }
-
             }
 
             if(read_fd2 != -1){
@@ -432,16 +384,14 @@ int process_redirection(char *input_args[], int write_fd1, int read_fd1, int wri
             }
             if(WEXITSTATUS(exit_value) != 0){
                 return -1;
-            }
-            
+            } 
         }
     }
-
     return 0;
 }
 
 /*
-*
+* Separate arguments via spaces
 */
 void separate_args(char *sec_of_command, char *command_args[])
 {
@@ -482,9 +432,9 @@ int parse_redirection(char *symbol, char *input_args[], int i, int is_redirect, 
 }
 
 /*
-*
+* Executes commands with both input and output redirection (< and > or < and >>)
 */
-int process_input_output_redir(int indices[], int index, int input_index, char *prev_args[], char *input_args[])
+int run_input_output_redir(int indices[], int index, int input_index, char *prev_args[], char *input_args[])
 {
     int fd_out;
     int fd_in;
@@ -552,9 +502,9 @@ int process_input_output_redir(int indices[], int index, int input_index, char *
 }
 
 /*
-*
+* Executes commands with just output redirection (> or >>)
 */
-int process_output_redir(int indices[], int index, char *prev_args[], char *input_args[], int read_fd2)
+int run_output_redir(int indices[], int index, char *prev_args[], char *input_args[], int read_fd2)
 {
     int fd_out;
     int output_index;
@@ -610,4 +560,62 @@ int process_output_redir(int indices[], int index, char *prev_args[], char *inpu
     }
 
     return 0;
+}
+
+/*
+* Handle the arguments in the middle of pipes
+*/
+void handle_middle_pipes(int j, char *command_args[], int *write_fd1, int *read_fd1, int *write_fd2, int *read_fd2)
+{
+    int pipe_fds[2];
+
+    if((j % 2) == 0){
+                
+        //close previous fds
+        if(j >= 2){
+            if(close(*read_fd1) == -1){
+                perror("close1");
+                exit(1);
+            }
+
+            if(close(*write_fd2) == -1){
+                perror("close2");
+                exit(1);
+            }
+        }
+        if(pipe(pipe_fds) == -1){
+            perror("pipe");
+            exit(1);
+        }
+        *read_fd1 = pipe_fds[0];
+        *write_fd1 = pipe_fds[1];
+        
+        process_redirection(command_args, *write_fd1, *read_fd1, *write_fd2, *read_fd2);
+    }
+    //if j is odd replace contents of fd2
+    else{
+        //close previous fds
+        if(j >= 2){
+            if(close(*read_fd2) == -1){
+                perror("close3");
+                exit(1);
+            }
+        }
+        
+        // //close write end, so we don't have to close in child
+        if(close(*write_fd1) == -1){
+            perror("close5");
+            exit(1);
+        }
+
+        if(pipe(pipe_fds) == -1){
+            perror("pipe");
+            exit(1);
+        }
+        *read_fd2 = pipe_fds[0];
+        *write_fd2 = pipe_fds[1];
+
+        process_redirection(command_args, *write_fd2, -1, -1, *read_fd1);
+
+    }
 }
